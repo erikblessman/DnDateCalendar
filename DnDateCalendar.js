@@ -1,6 +1,6 @@
 const DnDateCalendar = (() => {
 
-  const scriptName = "DnDateCalendar";
+  const scriptName = 'DnDateCalendar';
   const version = '0.0.1';
   const schemaVersion = 0.1;
 
@@ -19,18 +19,6 @@ const DnDateCalendar = (() => {
       return false;
     }
     return true;
-  }
-
-  const sendException = function ($e, $msg) {
-    sendChat('TokenMod', `/w gm ` +
-      `<div style="border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em;" >` +
-      `<div>There was an error while trying to run your command:</div>` +
-      `<div style="margin: .1em 1em 1em 1em;"><code>${$msg.content}</code></div>` +
-      `<div style="font-size: .6em; line-height: 1em;margin:.1em .1em .1em 1em; padding: .1em .3em; color: #666666; border: 1px solid #999999; border-radius: .2em; background-color: white;">` +
-      JSON.stringify({ msg: $msg, version: version, stack: $e.stack }) +
-      `</div>` +
-      `</div>`
-    );
   }
 
   const initState = function () {
@@ -87,7 +75,7 @@ const DnDateCalendar = (() => {
 
   const addDay = function ($days) {
     if (isNaN($days)) {
-      sendChat('DnDateCalendar', `/w gm invalid number of days [${$days}]`);
+      sendChat(scriptName, `/w gm invalid number of days [${$days}]`);
       return;
     }
     const days = parseInt($days);
@@ -131,22 +119,64 @@ const DnDateCalendar = (() => {
         delete state[scriptName];
         initState();
         break;
+      case 'help':
+        const who = args.length > 1 ? args[1] : $msg.who;
+        showHelp(who);
+        return;
       default:
-        sendChat('DnDateCalendar', `/w gm unknown command [${$msg.content}]`);
-        break;
+        throw new Error(`Unknown command [${$msg.content}]`);
     }
     showCalendar();
   };
+  // #endregion MESSAGE ROUTING
 
+  // #region DISPLAY FUNCTIONS
+  const whisper = function ($who, $content) {
+    const chatMessage = `/w ${$who} ${apiMessage($content)}`;
+    sendChat(scriptName, chatMessage);
+  }
+  const shout = function ($content) {
+    sendChat(scriptName, apiMessage($content));
+  }
+  const apiMessage = function ($content) {
+    const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em;';
+    return `<div style="${style}">${$content}</div>`;
+  }
+  const header = function ($txt) {
+    const style = 'font-size: 1.2em; font-weight: bold; text-align: center; color: #f66';
+    return `<div style="${style}">${$txt}</div>`;
+  }
+  const list = function ($items) {
+    const style = 'margin: .1em 1em 1em 1em; font-size: 1em; color: #666; text-align: left;';
+    return `<div><ul style="${style}">${$items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+  }
   const showCalendar = function () {
     const dateStr = getDateStr();
-    sendChat('DnDateCalendar', `/w gm ` +
-      `<div style="border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em;" >` +
-      `<div style="font-size: 1.2em; font-weight: bold; text-align: center;">${dateStr}</div>` +
-      `</div>`
-    );
+    sendChat(scriptName, `/w gm ${apiMessage(header(dateStr))}`);
   }
-  // #endregion MESSAGE ROUTING
+  const showHelp = function ($who) {
+    const commands = [
+      '!dndate - show the current date',
+      '!dndate next - advance the date by one day',
+      '!dndate prev - go back one day',
+      '!dndate add DAYS - add the specified number of days to the date( e.g. !dndate add 5 OR !dndate add -45)',
+      '!dndate reset - reset the date to the default',
+      '!dndate help - show this help message'
+    ];
+    whisper($who, header(`${scriptName} Help`) + list(commands));
+  }
+
+  const sendException = function ($e, $msg) {
+    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #666; text-align: center;`;
+    const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
+    log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
+    log('Exception:');
+    log(JSON.stringify($e));
+    log('Message:');
+    log(JSON.stringify($msg));
+    whisper('gm', header(`${scriptName} Error`) + errorStr);
+  }
+  // #endregion DISPLAY FUNCTIONS
 
   // #region EVENT HANDLERS
   const onChatMessage = function ($msg) {
