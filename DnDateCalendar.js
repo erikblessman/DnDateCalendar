@@ -40,36 +40,39 @@ const DnDateCalendar = (() => {
           { name: 'October', days: 31 },
           { name: 'November', days: 30 },
           { name: 'December', days: 31 }
-        ]
+        ],
       };
     }
   }
   // #endregion UTILITY FUNCTIONS
 
   // #region DATE FUNCTIONS
-  const getDate = function ($dayOfYear, $months, $year) {
-    if ($dayOfYear < 1) {
-      log(`Invalid dayOfYear(${$dayOfYear})`);
+  const getDate = function ($dayOfYear, $year, $months) {
+    let dayOfYear = $dayOfYear ?? state[scriptName].dayOfYear;
+    let year = $year ?? state[scriptName].year;
+    let months = $months ?? state[scriptName].months;
+    if (dayOfYear < 1) {
+      log(`Invalid dayOfYear(${dayOfYear})`);
       return null;
     }
-    let dayOfMonth = $dayOfYear;
+    let dayOfMonth = dayOfYear;
     let monthIndex = 0;
-    while (dayOfMonth > $months[monthIndex].days) {
-      dayOfMonth -= $months[monthIndex++].days;
-      if (monthIndex >= $months.length) {
+    while (dayOfMonth > months[monthIndex].days) {
+      dayOfMonth -= months[monthIndex++].days;
+      if (monthIndex >= months.length) {
         monthIndex = 0;
         ++$year;
       }
     }
     return {
       day: dayOfMonth,
-      month: $months[monthIndex],
-      year: $year
+      month: months[monthIndex],
+      year: year
     };
   }
 
-  const getDateStr = function () {
-    const date = getDate(state[scriptName].dayOfYear, state[scriptName].months, state[scriptName].year);
+  const getDateStr = function ($date) {
+    const date = $date ?? getDate();
     return `${date.day} ${date.month.name} ${date.year}`;
   }
 
@@ -106,6 +109,9 @@ const DnDateCalendar = (() => {
     const args = $msg.content.split(' ');
     args.shift();
     switch (args[0]) {
+      case 'alarms':
+        showAlarms();
+        return;
       case 'next':
         addDay(1);
         break;
@@ -135,9 +141,6 @@ const DnDateCalendar = (() => {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
     sendChat(scriptName, chatMessage);
   }
-  const shout = function ($content) {
-    sendChat(scriptName, apiMessage($content));
-  }
   const showCalendar = function () {
     const dateStr = getDateStr();
     sendChat(scriptName, `/w gm ${apiMessage(header(dateStr))}`);
@@ -148,10 +151,15 @@ const DnDateCalendar = (() => {
       ['!dndate next', 'advance the date by one day'],
       ['!dndate prev', 'go back one day'],
       ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
+      ['!dndate alarms', 'show this help message'],
       ['!dndate reset', 'reset the date to the default'],
-      ['!dndate help', 'show this help message']
+      ['!dndate help [WHO]', 'show this help message (e.g. !dndate help William)'],
     ];
-    whisper($who, header(`${scriptName} Help`) + list(commands));
+    whisper($who, header(`${scriptName} Help`) + table(commands));
+    const notes = [
+      'ARGS in [BRACKETS] are optional'
+    ]
+    whisper($who, header('Help Notes') + list(notes));
   }
   const showException = function ($e, $msg) {
     const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
@@ -163,11 +171,20 @@ const DnDateCalendar = (() => {
     log(JSON.stringify($msg));
     whisper('gm', header(`${scriptName} Error`) + errorStr);
   }
+  const showAlarms = function () {
+    const alarms = state[scriptName]?.alarms;
+    if (!alarms || alarms.length == 0) {
+      whisper('gm', header('Alarms') + 'No alarms set');
+      return;
+    }
+    const alarmRows = alarms.map(a => [getDateStr(getDate(a.dayOfYear, a.year, state[scriptName].months)), a.message]);
+    whisper('gm', header('Alarms') + table(alarmRows));
+  }
   // #endregion CHAT FUNCTIONS
 
   // #region HTML BUILDING FUNCTIONS
   const apiMessage = function ($content) {
-    const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em;';
+    const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em; color: #333;';
     return `<div style="${style}">${$content}</div>`;
   }
   const header = function ($txt) {
@@ -189,7 +206,7 @@ const DnDateCalendar = (() => {
     return `<div style="${baseStyle} ${$style}">${$content}</div>`;
   }
   const list = function ($items) {
-    return table($items);
+    return `<ul>${$items.map(i => `<li>${i}</li>`).join('')}</ul>`;
   }
   // #endregion HTML BUILDING FUNCTIONS
 
