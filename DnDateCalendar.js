@@ -130,7 +130,7 @@ const DnDateCalendar = (() => {
   };
   // #endregion MESSAGE ROUTING
 
-  // #region DISPLAY FUNCTIONS
+  // #region SHOW/CHAT FUNCTIONS
   const whisper = function ($who, $content) {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
     sendChat(scriptName, chatMessage);
@@ -138,6 +138,34 @@ const DnDateCalendar = (() => {
   const shout = function ($content) {
     sendChat(scriptName, apiMessage($content));
   }
+  const showCalendar = function () {
+    const dateStr = getDateStr();
+    sendChat(scriptName, `/w gm ${apiMessage(header(dateStr))}`);
+  }
+  const showHelp = function ($who) {
+    const commands = [
+      ['!dndate', 'show the current date'],
+      ['!dndate next', 'advance the date by one day'],
+      ['!dndate prev', 'go back one day'],
+      ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
+      ['!dndate reset', 'reset the date to the default'],
+      ['!dndate help', 'show this help message']
+    ];
+    whisper($who, header(`${scriptName} Help`) + list(commands));
+  }
+  const showException = function ($e, $msg) {
+    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
+    const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
+    log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
+    log('Exception:');
+    log(JSON.stringify($e));
+    log('Message:');
+    log(JSON.stringify($msg));
+    whisper('gm', header(`${scriptName} Error`) + errorStr);
+  }
+  // #endregion CHAT FUNCTIONS
+
+  // #region HTML BUILDING FUNCTIONS
   const apiMessage = function ($content) {
     const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em;';
     return `<div style="${style}">${$content}</div>`;
@@ -163,33 +191,7 @@ const DnDateCalendar = (() => {
   const list = function ($items) {
     return table($items);
   }
-  const showCalendar = function () {
-    const dateStr = getDateStr();
-    sendChat(scriptName, `/w gm ${apiMessage(header(dateStr))}`);
-  }
-  const showHelp = function ($who) {
-    const commands = [
-      ['!dndate', 'show the current date'],
-      ['!dndate next', 'advance the date by one day'],
-      ['!dndate prev', 'go back one day'],
-      ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
-      ['!dndate reset', 'reset the date to the default'],
-      ['!dndate help', 'show this help message']
-    ];
-    whisper($who, header(`${scriptName} Help`) + list(commands));
-  }
-
-  const sendException = function ($e, $msg) {
-    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
-    const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
-    log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
-    log('Exception:');
-    log(JSON.stringify($e));
-    log('Message:');
-    log(JSON.stringify($msg));
-    whisper('gm', header(`${scriptName} Error`) + errorStr);
-  }
-  // #endregion DISPLAY FUNCTIONS
+  // #endregion HTML BUILDING FUNCTIONS
 
   // #region EVENT HANDLERS
   const onChatMessage = function ($msg) {
@@ -199,7 +201,7 @@ const DnDateCalendar = (() => {
       }
       routeMessage($msg);
     } catch (e) {
-      sendException(e, $msg);
+      showException(e, $msg);
     }
 
   };
