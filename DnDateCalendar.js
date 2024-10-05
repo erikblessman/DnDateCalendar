@@ -143,12 +143,25 @@ const DnDateCalendar = (() => {
     return `<div style="${style}">${$content}</div>`;
   }
   const header = function ($txt) {
-    const style = 'font-size: 1.2em; font-weight: bold; text-align: center; color: #f66';
+    const style = 'font-size: 1.2em; font-weight: bold; text-align: center; color: #f66; padding: .2em 1em;';
     return `<div style="${style}">${$txt}</div>`;
   }
+  const table = function ($rows) {
+    return `<div style="display: table;">${$rows.map(r => row(r)).join('')}</div>`;
+  }
+  const row = function ($cells) {
+    return `<div style="display: table-row;">${$cells.map((c, i) => i == 0 ? headerCell(c) : cell(c)).join('')
+      }</div>`;
+  }
+  const headerCell = function ($content) {
+    return cell($content, 'font-weight: bold; color: #000;');
+  }
+  const cell = function ($content, $style) {
+    const baseStyle = 'display: table-cell; border: 1px solid #666; color: #333; padding: .2em .5em;';
+    return `<div style="${baseStyle} ${$style}">${$content}</div>`;
+  }
   const list = function ($items) {
-    const style = 'margin: .1em 1em 1em 1em; font-size: 1em; color: #666; text-align: left;';
-    return `<div><ul style="${style}">${$items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+    return table($items);
   }
   const showCalendar = function () {
     const dateStr = getDateStr();
@@ -156,18 +169,18 @@ const DnDateCalendar = (() => {
   }
   const showHelp = function ($who) {
     const commands = [
-      '!dndate - show the current date',
-      '!dndate next - advance the date by one day',
-      '!dndate prev - go back one day',
-      '!dndate add DAYS - add the specified number of days to the date( e.g. !dndate add 5 OR !dndate add -45)',
-      '!dndate reset - reset the date to the default',
-      '!dndate help - show this help message'
+      ['!dndate', 'show the current date'],
+      ['!dndate next', 'advance the date by one day'],
+      ['!dndate prev', 'go back one day'],
+      ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
+      ['!dndate reset', 'reset the date to the default'],
+      ['!dndate help', 'show this help message']
     ];
     whisper($who, header(`${scriptName} Help`) + list(commands));
   }
 
   const sendException = function ($e, $msg) {
-    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #666; text-align: center;`;
+    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
     const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
     log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
     log('Exception:');
