@@ -103,6 +103,28 @@ const DnDateCalendar = (() => {
     state[scriptName].dayOfYear = newDayOfYear;
     state[scriptName].year = newYear;
   }
+
+  const setDate = function ($args) {
+    const date = parseDateArgs($args);
+    state[scriptName].dayOfYear = date.dayOfYear;
+    state[scriptName].year = date.year;
+  }
+
+  const parseDateArgs = function ($args) {
+    const arg1 = $args.shift();
+    let matches = /^(\d+)[-.](\d+)[-.](\d+)/.exec(arg1);
+    if (matches) {
+      matches.shift();// remove the full match
+      const year = parseInt(matches[0]);
+      const month = parseInt(matches[1]);
+      const day = parseInt(matches[2]);
+      const dayOfYear = getDayOfYear(month, day);
+      return { year, dayOfYear, rest: $args };
+    }
+    const year = parseInt(arg1);
+    const dayOfYear = parseInt($args.shift());
+    return { year, dayOfYear, rest: $args };
+  }
   // #endregion DATE FUNCTIONS
 
   // #region MESSAGE ROUTING
@@ -137,6 +159,9 @@ const DnDateCalendar = (() => {
       case 'add':
         addDay(args.shift());
         break;
+      case 'set':
+        setDate(args);
+        break;
       case 'reset':
         delete state[scriptName];
         initState();
@@ -155,21 +180,8 @@ const DnDateCalendar = (() => {
   // #region ALARM FUNCTIONS
   const parseAlarmArgs = function ($args) {
     const name = $args.shift();
-    const arg2 = $args.shift();
-    let matches = /^(\d+)[-.](\d+)[-.](\d+)/.exec(arg2);
-    if (matches) {
-      const year = parseInt(matches[0]);
-      const month = parseInt(matches[1]);
-      const day = parseInt(matches[2]);
-      const message = $args.join(' ');
-      const dayOfMonth = getDayOfYear(month, day);
-      return { name, year, dayOfMonth, message };
-    }
-    const year = arg2;
-    const arg3 = $args.shift();
-    const dayOfYear = parseInt(arg3);
-    const message = $args.join(' ');
-    return { name, year, dayOfYear, message };
+    const { year, dayOfYear, rest } = parseDateArgs($args);
+    return { name, year, dayOfYear, message: rest.join(' ') };
   }
   const addAlarm = function ($args) {
     const alarm = parseAlarmArgs($args);
@@ -196,8 +208,11 @@ const DnDateCalendar = (() => {
   // #region ALARM FUNCTIONS
 
   // #region SHOW/CHAT FUNCTIONS
+  const debug = function ($msg) {
+    whisper('gm', $msg);
+  }
   const trace = function ($method, $num) {
-    sendChat(scriptName, `/w gm ${$method}:${$num}`);
+    whisper('gm', `${$method}:${$num}`);
   }
   const whisper = function ($who, $content) {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
@@ -213,6 +228,7 @@ const DnDateCalendar = (() => {
       ['!dndate next', 'advance the date by one day'],
       ['!dndate prev', 'go back one day'],
       ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
+      ['!dndate set DATE', 'set the date to the specified date'],
       ['!dndate alarms', 'show this help message'],
       ['!dndate alarm add|edit NAME DATE MESSAGE', 'add or edit an alarm'],
       ['!dndate reset', 'reset the date to the default'],
