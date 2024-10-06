@@ -76,6 +76,11 @@ const DnDateCalendar = (() => {
     return `${date.day} ${date.month.name} ${date.year}`;
   }
 
+  const getDayOfYear = function ($month, $day, $months) {
+    let months = $months ?? state[scriptName].months;
+    return months.slice(0, $month - 1).reduce((acc, month) => acc + month.days, 0) + $day;
+  }
+
   const addDay = function ($days) {
     if (isNaN($days)) {
       sendChat(scriptName, `/w gm invalid number of days [${$days}]`);
@@ -107,9 +112,20 @@ const DnDateCalendar = (() => {
       return;
     }
     const args = $msg.content.split(' ');
-    args.shift();
-    switch (args[0]) {
+    args.shift(); // remove the !date arg
+    const command = args.shift();
+    switch (command) {
       case 'alarms':
+        showAlarms();
+        return;
+      case 'alarm':
+        const command2 = args.shift();
+        switch (command2) {
+          case 'add': addAlarm(args); break;
+          case 'edit': editAlarm(args); break;
+          case 'delete': deleteAlarm(args); break;
+          default: throw new Error(`Unknown alarm command [${command2}]`);
+        }
         showAlarms();
         return;
       case 'next':
@@ -119,14 +135,14 @@ const DnDateCalendar = (() => {
         addDay(-1);
         break;
       case 'add':
-        addDay(args[1]);
+        addDay(args.shift());
         break;
       case 'reset':
         delete state[scriptName];
         initState();
         break;
       case 'help':
-        const who = args.length > 1 ? args[1] : $msg.who;
+        const who = args.length > 0 ? args[0] : $msg.who;
         showHelp(who);
         return;
       default:
@@ -136,7 +152,53 @@ const DnDateCalendar = (() => {
   };
   // #endregion MESSAGE ROUTING
 
+  // #region ALARM FUNCTIONS
+  const parseAlarmArgs = function ($args) {
+    const name = $args.shift();
+    const arg2 = $args.shift();
+    let matches = /^(\d+)[-.](\d+)[-.](\d+)/.exec(arg2);
+    if (matches) {
+      const year = parseInt(matches[0]);
+      const month = parseInt(matches[1]);
+      const day = parseInt(matches[2]);
+      const message = $args.join(' ');
+      const dayOfMonth = getDayOfYear(month, day);
+      return { name, year, dayOfMonth, message };
+    }
+    const year = arg2;
+    const arg3 = $args.shift();
+    const dayOfYear = parseInt(arg3);
+    const message = $args.join(' ');
+    return { name, year, dayOfYear, message };
+  }
+  const addAlarm = function ($args) {
+    const alarm = parseAlarmArgs($args);
+    if (state[scriptName].alarms.find(a => a.name == alarm.name)) {
+      throw new Error(`Alarm [${alarm.name}] already exists`);
+    }
+    state[scriptName].alarms.push(alarm);
+  }
+  const editAlarm = function ($args) {
+    const alarm = parseAlarmArgs($args);
+    const existingAlarm = state[scriptName].alarms.find(a => a.name == alarm.name);
+    existingAlarm.year = alarm.year;
+    existingAlarm.dayOfYear = alarm.dayOfYear;
+    existingAlarm.message = alarm.message;
+  }
+  const deleteAlarm = function ($args) {
+    const name = $args.shift();
+    const index = state[scriptName].alarms.findIndex(a => a.name == name);
+    if (index == -1) {
+      throw new Error(`Alarm [${name}] not found`);
+    }
+    state[scriptName].alarms.splice(index, 1);
+  }
+  // #region ALARM FUNCTIONS
+
   // #region SHOW/CHAT FUNCTIONS
+  const trace = function ($method, $num) {
+    sendChat(scriptName, `/w gm ${$method}:${$num}`);
+  }
   const whisper = function ($who, $content) {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
     sendChat(scriptName, chatMessage);
@@ -152,12 +214,15 @@ const DnDateCalendar = (() => {
       ['!dndate prev', 'go back one day'],
       ['!dndate add DAYS', 'add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
       ['!dndate alarms', 'show this help message'],
+      ['!dndate alarm add|edit NAME DATE MESSAGE', 'add or edit an alarm'],
       ['!dndate reset', 'reset the date to the default'],
       ['!dndate help [WHO]', 'show this help message (e.g. !dndate help William)'],
     ];
     whisper($who, header(`${scriptName} Help`) + table(commands));
     const notes = [
-      'ARGS in [BRACKETS] are optional'
+      'ARGS in [BRACKETS] are optional',
+      'Alternatives args are separated by | (as with !dndate alarm add|edit)',
+      'DATE is in the format YYYY-MM-DD or YYYY DOY',
     ]
     whisper($who, header('Help Notes') + list(notes));
   }
@@ -177,7 +242,8 @@ const DnDateCalendar = (() => {
       whisper('gm', header('Alarms') + 'No alarms set');
       return;
     }
-    const alarmRows = alarms.map(a => [getDateStr(getDate(a.dayOfYear, a.year, state[scriptName].months)), a.message]);
+    const alarmRows = alarms.map(a => [a.name, getDateStr(getDate(a.dayOfYear, a.year, state[scriptName].months)), a.message]);
+    alarmRows.unshift(['Name', 'Date', 'Message']);
     whisper('gm', header('Alarms') + table(alarmRows));
   }
   // #endregion CHAT FUNCTIONS
