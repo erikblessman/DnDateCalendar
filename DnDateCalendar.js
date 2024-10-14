@@ -6,8 +6,7 @@ const DnDateCalendar = (() => {
   //TODO: suggestion use javascript get/set keywords for the calendar
   let calendar = null;
   //TODO: suggestion: store logLevel in state and provede setters/getters
-  const DEBUG = false;
-  const TRACE = false;
+  let LOG_LEVEL = 'WARN';
 
   // #region STATE FUNCTIONS
   const initState = function () {
@@ -116,21 +115,24 @@ const DnDateCalendar = (() => {
         return;
       case 'logState':
         log(JSON.stringify(state[scriptName]));
-        break;
+        return;
+      case 'logLevel':
+        LOG_LEVEL = args.shift();
+        whisper('gm', `Log Level set to [${LOG_LEVEL}]`);
+        return;;
       default:
         throw new Error(`Unknown command [${$msg.content}]`);
     }
-    log(JSON.stringify(calendar));
     showCalendar();
   };
   // #endregion MESSAGE ROUTING
 
   // #region SHOW/CHAT FUNCTIONS
   const debug = function ($msg) {
-    DEBUG && whisper('gm', $msg);
+    ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && whisper('gm', $msg);
   }
   const trace = function ($method, $num) {
-    TRACE && whisper('gm', `${$method}:${$num}`);
+    ['TRACE'].includes(LOG_LEVEL) && whisper('gm', `${$method}:${$num}`);
   }
   const whisper = function ($who, $content) {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
