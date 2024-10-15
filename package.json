@@ -1,0 +1,28 @@
+{
+  "name": "dndatecalendar",
+  "version": "0.1.0",
+  "description": "DnDateCalendar provides a configurable calendar with alarms.\\r\\rFor instructions run `!dndate --help` in game.",
+  "main": "DnDateCalendar.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erikblessman/DnDateCalendar.git"
+  },
+  "keywords": [
+    "Roll20",
+    "API",
+    "Calendar",
+    "Alarm"
+  ],
+  "author": "https://app.roll20.net/users/2455065/obee-wonkee-noby",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/erikblessman/DnDateCalendar/issues"
+  },
+  "homepage": "https://github.com/erikblessman/DnDateCalendar#readme",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
