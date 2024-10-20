@@ -322,13 +322,10 @@ const DnDateCalendar = (() => {
         dayOfYear -= yearsToAdd * daysInYear;
         year += yearsToAdd;
       } else if (dayOfYear < 1) {
-        let daysFromEndOfYear = Math.abs(dayOfYear) % daysInYear;
-        let yearsToRemove = Math.ceil(Math.abs(dayOfYear) / daysInYear) + 1;
-        debug(`addDays: ${JSON.stringify({ dayOfYear, daysInYear, yearsToRemove })}`);
-        dayOfYear = daysInYear - daysFromEndOfYear;
+        const yearsToRemove = Math.ceil(Math.abs(dayOfYear) / daysInYear);
+        dayOfYear += yearsToRemove * daysInYear;
         year -= yearsToRemove;
       }
-      debug(`addDays: ${JSON.stringify({ year, dayOfYear })}`);
       return new DnDate(year, dayOfYear);
     }
     setDate($args) {
