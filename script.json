@@ -1,7 +1,7 @@
 {
   "name": "DnDateCalendar",
   "script": "DnDateCalendar.js",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "DnDateCalendar provides a configurable calendar with alarms.\r\rFor instructions run `!dndate --help` in game.",
   "authors": "Obee Wonkee Noby",
   "roll20userid": "2455065",
