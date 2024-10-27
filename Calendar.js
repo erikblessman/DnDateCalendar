@@ -1,8 +1,7 @@
 class Month {
-  constructor(fullName, shortName, numericName, days) {
+  constructor(fullName, shortName, days) {
     this.#fullName = fullName;
     this.#shortName = shortName;
-    this.#numericName = numericName;
     this.#days = days;
   }
 
@@ -11,9 +10,6 @@ class Month {
 
   #shortName;
   get shortName() { return this.#shortName; }
-
-  #numericName;
-  get numericName() { return this.#numericName; }
 
   #days;
   get days() { return this.#days; }
@@ -97,6 +93,25 @@ class Calendar {
 
   #daysInYear;
   get daysInYear() { return this.#daysInYear; }
+
+  get month() {
+    if (this.#date.dayOfYear < 1 || this.#date.dayOfYear > this.#daysInYear) {
+      return null;
+    }
+    let days = 0;
+    for (let i = 0; i < this.#months.length; i++) {
+      const month = this.#months[i];
+      days += month.days;
+      if (this.#date.dayOfYear <= days) {
+        return month;
+      }
+    }
+    return null;
+  }
+
+  get dateStr() {
+    return null;
+  }
   // #endregion properties/getters
 
   // #region mutators
@@ -119,7 +134,25 @@ class Calendar {
       }
       this.#date.dayOfYear = daysFromBeginningOfCurrentYear;
     }
-    // #endregion mutators
+  }
+
+  /***
+   * Sets the current date to the specified date.
+   * @param {DnDate|string} date - The date to set.
+   */
+  setDate(date) {
+    let newDate;
+    if (date instanceof DnDate) {
+      if (date.dayOfYear < 1 || date.dayOfYear > this.#daysInYear) {
+        throw new Error(`Invalid day of year (${date.dayOfYear})`);
+      }
+      newDate = new DnDate(date.year, date.dayOfYear);
+    } else if (typeof date === 'string') {
+      newDate = this.parseDateStr(date);
+    } else {
+      throw new Error('date must be a DnDate object or a string');
+    }
+    this.#date = newDate;
   }
   // #endregion mutators
 

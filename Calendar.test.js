@@ -16,19 +16,24 @@ describe('Calendar.constructor', () => {
   });
 
   it('should set months from parms', () => {
-    const months = [new Month('Month One', 'One', '01', 11), new Month('Month Two', 'Two', '02', 22), new Month('Month Three', 'Three', '03', 33)];
+    const months = [
+      new Month('Month One', 'One', 11),
+      new Month('Month Two', 'Two', 22),
+      new Month('Month Three', 'Three', 33)];
     const calendar = new Calendar({ months });
     expect(calendar.months).toBe(months);
     expect(calendar.months.length).toBe(3);
     const m1 = calendar.months[0];
     expect(m1.fullName).toBe('Month One');
     expect(m1.shortName).toBe('One');
-    expect(m1.numericName).toBe('01');
     expect(m1.days).toBe(11);
   });
 
   it('should set months with default value', () => {
-    jest.spyOn(Calendar, 'getDefaultParms').mockReturnValue({ schemaVersion: 0, months: [new Month('Month 1', 'M1', '001', 100)], date: new DnDate(1, 1) });
+    jest.spyOn(Calendar, 'getDefaultParms').mockReturnValue({
+      schemaVersion: 0, months: [
+        new Month('Month 1', 'M1', 100)], date: new DnDate(1, 1)
+    });
     const calendar = new Calendar();
     expect(calendar.months).toBeDefined();
     expect(Array.isArray(calendar.months)).toBe(true);
@@ -37,7 +42,6 @@ describe('Calendar.constructor', () => {
     expect(m1).toBeInstanceOf(Month);
     expect(m1.fullName).toBe('Month 1');
     expect(m1.shortName).toBe('M1');
-    expect(m1.numericName).toBe('001');
     expect(m1.days).toBe(100);
   });
 
@@ -94,9 +98,9 @@ describe('Calendar.daysInYear', () => {
   it('should return the number of days in a year', () => {
     const calendar = new Calendar({
       months: [
-        new Month('Month 1', 'M1', '001', 100),
-        new Month('Month 2', 'M2', '002', 20),
-        new Month('Month 3', 'M3', '003', 3)]
+        new Month('Month 1', 'M1', 100),
+        new Month('Month 2', 'M2', 20),
+        new Month('Month 3', 'M3', 3)]
     });
     expect(calendar.daysInYear).toBe(123);
   })
@@ -105,9 +109,9 @@ describe('Calendar.daysInYear', () => {
 describe('Calendar.addDays', () => {
   const calendar = new Calendar({
     months: [
-      new Month('Month 1', 'M1', '001', 100),
-      new Month('Month 2', 'M2', '002', 20),
-      new Month('Month 3', 'M3', '003', 3)]
+      new Month('Month 1', 'M1', 100),
+      new Month('Month 2', 'M2', 20),
+      new Month('Month 3', 'M3', 3)]
   });
   test.each([
     // description, days, year, dayOfYear, expectedYear, expectedDayOfYear
@@ -124,12 +128,81 @@ describe('Calendar.addDays', () => {
   });
 });
 
+describe('Calendar.setDate', () => {
+  const calendar = new Calendar({
+    months: [
+      new Month('Month 1', 'M1', 100),
+      new Month('Month 2', 'M2', 20),
+      new Month('Month 3', 'M3', 3)]
+  });
+  // Test with valid DnDate objects
+  test.each([
+    // year, dayOfYear
+    [1, 1],
+    [17, 12],
+    [1999, 123],
+    [2000, 1],
+  ])('should set the date to a valid DnDate object (%i, %i)', (year, dayOfYear) => {
+    const date = new DnDate(year, dayOfYear);
+    calendar.setDate(date);
+    expect(calendar.date).not.toBe(date);
+    expect(calendar.date.year).toBe(year);
+    expect(calendar.date.dayOfYear).toBe(dayOfYear);
+  });
+  // Test with INVALID DnDate objects (for this calendar)
+  test.each([
+    // year, dayOfYear
+    [1, 0], // day < 1
+    [17, -13], // day < 1
+    [1999, 124], // day > days in year
+    [2000, 444], // day > days in year
+  ])('should throw error for invalid date (%i, %i)', (year, dayOfYear) => {
+    const date = new DnDate(year, dayOfYear);
+    expect(() => calendar.setDate(date)).toThrow();
+  });
+  // Test with valid strings
+  test.each([
+    // year, dayOfYear
+    ['523-01', 523, 1],
+    ['523-66', 523, 66],
+    ['243-01-01', 243, 1],
+    ['7654-02-20', 7654, 120],
+    ['123-M2-04', 123, 104],
+    ['353-Month 3-3', 353, 123],
+  ])('should set the date from a valid string (%s)', (str, year, dayOfYear) => {
+    calendar.setDate(str);
+    expect(calendar.date).toBeDefined();
+    expect(calendar.date).toBeInstanceOf(DnDate);
+    expect(calendar.date.year).toBe(year);
+    expect(calendar.date.dayOfYear).toBe(dayOfYear);
+  });
+  // Test with INVALID strings (for this calendar)
+  test.each([
+    // string
+    ['243-01-01-01'], // Bad format
+    ['bob'], // Bad format
+    [undefined], // Bad format
+    [null], // Bad format
+    [44], // Bad format
+    [{}], // Bad format
+    [[]], // Bad format
+    ['534-00'], // Day < 1
+    ['534-124'], // Too many days in year
+    ['534-999'], // Too many days in year
+    ['123-M2-0'], // Day < 1
+    ['123-M2-23'], // Too many days for month
+    ['123-M2-623'], // Too many days for month
+  ])('should throw error for invalid string (%s))', (str) => {
+    expect(() => calendar.setDate(str)).toThrow();
+  });
+});
+
 describe('Calendar.parseDateStr', () => {
   const calendar = new Calendar({
     months: [
-      new Month('Month 1', 'M1', '001', 11),
-      new Month('Month 2', 'M2', '002', 22),
-      new Month('Month 3', 'M3', '003', 33)]
+      new Month('Month 1', 'M1', 11),
+      new Month('Month 2', 'M2', 22),
+      new Month('Month 3', 'M3', 33)]
   });
   // test valid strings
   test.each([
@@ -170,9 +243,9 @@ describe('Calendar.parseDateStr', () => {
 describe('Calendar.dateFromParts', () => {
   const calendar = new Calendar({
     months: [
-      new Month('Month 1', 'M1', '001', 11),
-      new Month('Month 2', 'M2', '002', 22),
-      new Month('Month 3', 'M3', '003', 33)]
+      new Month('Month 1', 'M1', 11),
+      new Month('Month 2', 'M2', 22),
+      new Month('Month 3', 'M3', 33)]
   });
   // test valid parts
   test.each([
@@ -207,3 +280,45 @@ describe('Calendar.dateFromParts', () => {
     expect(() => calendar.dateFromParts(year, month, day)).toThrow(errorText);
   });
 });
+
+describe('Calendar.month', () => {
+  const months = [
+    new Month('Month 1', 'M1', 11),
+    new Month('Month 2', 'M2', 22),
+    new Month('Month 3', 'M3', 33)];
+  // Test valid day of year
+  test.each([
+    // dayOfYear, expectedMonth
+    [1, months[0]],
+    [11, months[0]],
+    [12, months[1]],
+    [33, months[1]],
+    [34, months[2]],
+    [66, months[2]],
+  ])(`should return the correct month for day of year (%i)`, (dayOfYear, expectedMonth) => {
+    const calendar = new Calendar({ months, date: new DnDate(1, dayOfYear) });
+    expect(calendar.month).toBe(expectedMonth);
+  });
+  // Test invalid day of year
+  test.each([-5, 0, 67, 100, 999])('should throw an error for invalid day of year (%i)', (dayOfYear) => {
+    const calendar = new Calendar({ months, date: new DnDate(1, dayOfYear) });
+    expect(calendar.month).toBe(null);
+  });
+});
+
+// describe('Calendar.dateStr', () => {
+//   const months = [new Month('Month 1', 'M1', 33)];
+//   const date = new DnDate(42, 9);
+//   // Test valid formats
+//   test.each([
+//     // format, expectedStr
+//     ['YYYY-DOY', '0042-09'],
+//     ['YYY-M-DD', '042-1-09'],
+//     ['YYY-MM-D', '042-01-9'],
+//     ['Y-Mmm-DDDD', '42-M1-0009'],
+//     ['YYYYYY-Month-DD', '000042-Month 1-09'],
+//   ])('should return the correct date string (%i)', (format, expectedStr) => {
+//     const calendar = new Calendar({ months, date, format });
+//     expect(calendar.dateStr).toBe(expectedStr);
+//   });
+// });
