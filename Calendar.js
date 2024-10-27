@@ -20,19 +20,17 @@ class Month {
 }
 
 class DnDate {
-  constructor(_year, _dayOfYear) {
-    this.#year = _year;
-    this.#dayOfYear = _dayOfYear;
+  constructor(year, dayOfYear) {
+    this.year = year;
+    this.dayOfYear = dayOfYear;
   }
 
-  #year;
-  get year() { return this.#year; }
-
-  #dayOfYear;
-  get dayOfYear() { return this.#dayOfYear; }
+  year;
+  dayOfYear;
 }
 
 class Calendar {
+  // #region static
   static getDefaultParms() {
     return {
       schemaVersion: 0,
@@ -55,14 +53,33 @@ class Calendar {
       alarms: [],
     };
   };
+  // #endregion static
+
+  // #region constructor
+  /***
+   * @param {object} parms - Valid properties are:
+   * - schemaVersion: number (default 0)
+   * - months: array of Month objects (default January - December)
+   * - date: DnDate object (default year: 1, dayOfYear: 1)
+   * - format: string (default 'YYYY-MM-DD')
+   * - alarms: array of Alarm objects (default [])
+   * @returns {Calendar}
+   */
   constructor(parms) {
     parms = { ...Calendar.getDefaultParms(), ...parms };
     this.#schemaVersion = parms.schemaVersion;
-    this.#months = parms.months;
     this.#date = parms.date;
     this.#format = parms.format;
-  }
 
+    // freeze the months array and each month object
+    this.#months = parms.months;
+    this.#months.forEach(month => Object.freeze(month));
+    Object.freeze(this.#months);
+    this.#daysInYear = this.#months.reduce((acc, month) => acc + month.days, 0);
+  }
+  // #endregion constructor
+
+  // #region properties/getters
   #schemaVersion;
   get schemaVersion() { return this.#schemaVersion; }
 
@@ -77,6 +94,112 @@ class Calendar {
 
   #alarms;
   get alarms() { return this.#alarms; }
+
+  #daysInYear;
+  get daysInYear() { return this.#daysInYear; }
+  // #endregion properties/getters
+
+  // #region mutators
+  /***
+   * Adds (or subtracts) the specified number of days to the current date.
+   * @param {number} days - The number of days to add (or subtract) to the current date. (Use negative numbers to subtract days.)
+   */
+  addDays(days) {
+    if (days > 0) {
+      let daysFromBeginningOfCurrentYear = this.#date.dayOfYear + days;
+      const yearsToAdd = Math.floor(daysFromBeginningOfCurrentYear / this.#daysInYear);
+      this.#date.year += yearsToAdd;
+      this.#date.dayOfYear = daysFromBeginningOfCurrentYear % this.#daysInYear;
+    } else if (days < 0) {
+      let daysFromBeginningOfCurrentYear = this.#date.dayOfYear + days;
+      if (daysFromBeginningOfCurrentYear < 1) {
+        const yearsToSubtract = Math.floor(Math.abs(daysFromBeginningOfCurrentYear) / this.#daysInYear) + 1;
+        this.#date.year -= yearsToSubtract;
+        daysFromBeginningOfCurrentYear = this.#daysInYear - (Math.abs(daysFromBeginningOfCurrentYear) % this.#daysInYear);
+      }
+      this.#date.dayOfYear = daysFromBeginningOfCurrentYear;
+    }
+    // #endregion mutators
+  }
+  // #endregion mutators
+
+  // #region utility methods
+  /***
+   * Parses a date string into a DnDate object.
+   * @param {string} str - The date string to parse.  Valid formats are: YYYY-DOY, YYYY-MM-DD, or YYYY-Mmm-DD
+   * @returns {DnDate} - The parsed date object.
+   */
+  parseDateStr(str) {
+    if (!str) {
+      throw new Error('no date string provided');
+    }
+    if (typeof str !== 'string') {
+      throw new Error('date string must be a string');
+    }
+
+    // Parsing format YYYY-DOY
+    if (str.match(/^\d+-\d+$/)) {
+      const [year, dayOfYear] = str.split('-');
+      const y = parseInt(year);
+      const d = parseInt(dayOfYear);
+      if (d < 1 || d > this.#daysInYear) {
+        throw new Error(`Invalid day of year (${dayOfYear})`);
+      }
+      return new DnDate(y, d);
+    }
+
+    // Parsing format YYYY-MM-DD
+    if (str.match(/^\d+-\d+-\d+$/)) {
+      return this.dateFromParts(...str.split('-'));
+    }
+
+    // Parsing format YYYY-Mmm-DD
+    if (str.match(/^\d+-.+-\d+$/)) {
+      const [year, month, day] = str.split('-');
+      let mIndex = this.#months.findIndex(m => m.fullName.toLowerCase() === month.toLowerCase());
+      if (mIndex === -1) {
+        mIndex = this.#months.findIndex(m => m.shortName.toLowerCase() === month.toLowerCase());
+      }
+      if (mIndex === -1) {
+        throw new Error(`Invalid month (${month})`);
+      }
+      const monthObj = this.#months[mIndex];
+      const y = parseInt(year);
+      const m = mIndex + 1;
+      const d = parseInt(day);
+      if (d < 1 || d > monthObj.days) {
+        throw new Error(`Invalid day (${day})`);
+      }
+      return this.dateFromParts(y, m, d);
+    }
+
+    throw new Error(`Invalid date string (${str}).  Use one of the following formats: YYYY-DOY, YYYY-MM-DD, or YYYY-Mmm-DD`);
+  }
+
+  /***
+   * Creates a DnDate object from the specified year, month, and day.
+   * @param {number} year - The year of the date.
+   * @param {number} month - The month of the date.
+   * @param {number} day - The day of the date.
+   * @returns {DnDate} - The date object.
+   */
+  dateFromParts(year, month, day) {
+    const y = parseInt(year);
+    if (isNaN(y)) {
+      throw new Error(`Invalid year (${year})`);
+    }
+    const m = parseInt(month);
+    if (isNaN(m) || m < 1 || m > this.#months.length) {
+      throw new Error(`Invalid month (${month})`);
+    }
+    const mObj = this.#months[m - 1];
+    const d = parseInt(day);
+    if (isNaN(d) || d < 1 || d > mObj.days) {
+      throw new Error(`Invalid day (${day})`);
+    }
+    return new DnDate(y, this.#months.slice(0, m - 1).reduce((acc, month) => acc + month.days, 0) + d);
+  }
+  // #endregion utility methods
 }
 
 module.exports = { DnDate, Month, Calendar };
