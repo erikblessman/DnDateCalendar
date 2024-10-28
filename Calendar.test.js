@@ -306,19 +306,42 @@ describe('Calendar.month', () => {
   });
 });
 
-// describe('Calendar.dateStr', () => {
-//   const months = [new Month('Month 1', 'M1', 33)];
-//   const date = new DnDate(42, 9);
-//   // Test valid formats
-//   test.each([
-//     // format, expectedStr
-//     ['YYYY-DOY', '0042-09'],
-//     ['YYY-M-DD', '042-1-09'],
-//     ['YYY-MM-D', '042-01-9'],
-//     ['Y-Mmm-DDDD', '42-M1-0009'],
-//     ['YYYYYY-Month-DD', '000042-Month 1-09'],
-//   ])('should return the correct date string (%i)', (format, expectedStr) => {
-//     const calendar = new Calendar({ months, date, format });
-//     expect(calendar.dateStr).toBe(expectedStr);
-//   });
-// });
+describe('Calendar.getDateParts', () => {
+  const m1 = new Month('Month 1', 'M1', 11);
+  const m2 = new Month('Month 2', 'M2', 22);
+  const m3 = new Month('Month 3', 'M3', 33);
+  const months = [m1, m2, m3];
+  const calendar = new Calendar({ months });
+  test.each([
+    // year, dayOfYear, expectedParts
+    [1, 0, 1],
+    [11, 0, 11],
+    [31, 1, 20],
+    [34, 2, 1],
+    [66, 2, 33],
+  ])('should return the correct parts for a valid date (%i, %i)', (dayOfYear, monthIndex, dayOfMonth) => {
+    const date = new DnDate(1, dayOfYear);
+    calendar.setDate(date);
+    const parts = calendar.getDateParts();
+    expect(parts.monthIndex).toEqual(monthIndex);
+    expect(parts.month).toEqual(months[monthIndex]);
+    expect(parts.dayOfMonth).toEqual(dayOfMonth);
+  });
+});
+
+describe('Calendar.dateStr', () => {
+  const months = [new Month('Month 1', 'M1', 33)];
+  const date = new DnDate(42, 9);
+  const calendar = new Calendar({ months, date });
+  // Test valid formats
+  test.each([
+    // format, expectedStr
+    ['YYYY-DOY', '0042-9'],
+    ['YYY-M-DD', '042-1-09'],
+    ['YYY-MM-D', '042-01-9'],
+    ['Y-Mon-DDDD', '42-M1-0009'],
+    ['YYYYYY Month DD', '000042 Month 1 09'],
+  ])('should return the correct date string (%s)', (format, expectedStr) => {
+    expect(calendar.getDateStr(format)).toBe(expectedStr);
+  });
+});

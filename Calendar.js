@@ -109,8 +109,25 @@ class Calendar {
     return null;
   }
 
-  get dateStr() {
-    return null;
+  getDateStr(format = this.#format) {
+    // year replacements
+    let str = format.replaceAll('DOY', this.#date.dayOfYear.toString());
+    str = str.replaceAll(/Y+/g, str => this.#date.year.toString().padStart(str.length, '0'));
+
+    // day replacements
+    const parts = this.getDateParts();
+    str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
+
+    // month replacements
+    const longNamePH = '^^^^';
+    const shortNamePH = ';;;;';
+    str = str.replaceAll('Month', longNamePH);
+    str = str.replaceAll('Mon', shortNamePH);
+    const monthNum = parseInt(parts.monthIndex) + 1;
+    str = str.replaceAll(/M+/g, str => monthNum.toString().padStart(str.length, '0'));
+    str = str.replaceAll(longNamePH, parts.month.fullName);
+    str = str.replaceAll(shortNamePH, parts.month.shortName);
+    return str;
   }
   // #endregion properties/getters
 
@@ -231,6 +248,20 @@ class Calendar {
       throw new Error(`Invalid day (${day})`);
     }
     return new DnDate(y, this.#months.slice(0, m - 1).reduce((acc, month) => acc + month.days, 0) + d);
+  }
+
+  /***
+   * Returns the month, monthIndex, and day of month for the current date.
+   */
+  getDateParts() {
+    let days = this.#date.dayOfYear;
+    for (let i = 0; i < this.#months.length; i++) {
+      const month = this.#months[i];
+      if (days <= month.days) {
+        return { month: month, monthIndex: i, dayOfMonth: days };
+      }
+      days -= month.days;
+    }
   }
   // #endregion utility methods
 }
