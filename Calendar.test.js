@@ -1,6 +1,21 @@
-const { DnDate, Month, Calendar } = require('./Calendar');
+const { Alarm, DnDate, Month, Calendar } = require('./Calendar');
 
 describe('Calendar.constructor', () => {
+  it('should set properties from parms', () => {
+    const parms = {
+      schemaVersion: 17,
+      months: [new Month('Month 1', 'M1', 11)],
+      date: new DnDate(1, 1),
+      format: 'YYYY-MM-DD',
+      alarms: [new Alarm('Alarm 1', 'A1', 1),]
+    };
+    const calendar = new Calendar(parms);
+    expect(calendar.schemaVersion).toBe(17);
+    expect(calendar.months).toBe(parms.months);
+    expect(calendar.date).toBe(parms.date);
+    expect(calendar.format).toBe(parms.format);
+    expect(calendar.alarms).toBe(parms.alarms);
+  });
   it('should set schemaVersion from parms', () => {
     const parms = { schemaVersion: 17 };
     const calendar = new Calendar(parms);
@@ -332,7 +347,7 @@ describe('Calendar.getDateParts', () => {
 describe('Calendar.dateStr', () => {
   const months = [new Month('Month 1', 'M1', 33)];
   const date = new DnDate(42, 9);
-  const calendar = new Calendar({ months, date });
+  const calendar = new Calendar({ months, date, format: 'DDDD<quack>Month<quack>YYYYYYYY' });
   // Test valid formats
   test.each([
     // format, expectedStr
@@ -341,7 +356,12 @@ describe('Calendar.dateStr', () => {
     ['YYY-MM-D', '042-01-9'],
     ['Y-Mon-DDDD', '42-M1-0009'],
     ['YYYYYY Month DD', '000042 Month 1 09'],
+    ['Mon Mon Mon', 'M1 M1 M1'],
   ])('should return the correct date string (%s)', (format, expectedStr) => {
     expect(calendar.getDateStr(format)).toBe(expectedStr);
+  });
+
+  it('should use the default format if none is provided', () => {
+    expect(calendar.getDateStr()).toBe('0009<quack>Month 1<quack>00000042');
   });
 });

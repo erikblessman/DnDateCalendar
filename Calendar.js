@@ -25,6 +25,14 @@ class DnDate {
   dayOfYear;
 }
 
+class Alarm {
+  constructor(name, date, message) {
+    this.name = name;
+    this.date = date;
+    this.message = message;
+  }
+}
+
 class Calendar {
   // #region static
   static getDefaultParms() {
@@ -51,7 +59,7 @@ class Calendar {
   };
   // #endregion static
 
-  // #region constructor
+  // #region construction
   /***
    * @param {object} parms - Valid properties are:
    * - schemaVersion: number (default 0)
@@ -66,11 +74,14 @@ class Calendar {
     this.#schemaVersion = parms.schemaVersion;
     this.#date = parms.date;
     this.#format = parms.format;
+    this.#alarms = parms.alarms;
 
     // freeze the months array and each month object
     this.#months = parms.months;
     this.#months.forEach(month => Object.freeze(month));
     Object.freeze(this.#months);
+
+    // Calculate the days in the year based on the months
     this.#daysInYear = this.#months.reduce((acc, month) => acc + month.days, 0);
   }
   // #endregion constructor
@@ -109,6 +120,20 @@ class Calendar {
     return null;
   }
 
+  /**
+   * Formats the current date as a string.
+   * @param {string} format The format you want the date in (default: this.format)
+   *  Use the following placeholders: DOY, YYYY, MM, DD, Month, Mon.
+   * For YYYY and DD, you can increase the number of characters to pad with zeros.
+   * DOY is the day of the year (1-number of days in the year).
+   * YYYY is the year.
+   * MM is the month number (1-12).
+   * DD is the day of the month.
+   * Month is the full month name.
+   * Mon is the short month name.
+   * Aside from these placeholders, the format string can contain any other characters.
+   * @returns 
+   */
   getDateStr(format = this.#format) {
     // year replacements
     let str = format.replaceAll('DOY', this.#date.dayOfYear.toString());
@@ -266,4 +291,4 @@ class Calendar {
   // #endregion utility methods
 }
 
-module.exports = { DnDate, Month, Calendar };
+module.exports = { Alarm, DnDate, Month, Calendar };
