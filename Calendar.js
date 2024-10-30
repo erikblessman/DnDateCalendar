@@ -196,6 +196,13 @@ class Calendar {
     }
     this.#date = newDate;
   }
+
+  addAlarm(alarm) {
+    if (this.#alarms.find(a => a.name === alarm.name)) {
+      throw new Error(`Alarm with name ${alarm.name} already exists`);
+    }
+    this.#alarms.push(alarm);
+  }
   // #endregion mutators
 
   // #region utility methods

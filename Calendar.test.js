@@ -219,7 +219,7 @@ describe('Calendar.parseDateStr', () => {
       new Month('Month 2', 'M2', 22),
       new Month('Month 3', 'M3', 33)]
   });
-  // test valid strings
+  // Test valid strings
   test.each([
     // date string, year, dayOfYear
     ['523-01', 523, 1],
@@ -235,7 +235,7 @@ describe('Calendar.parseDateStr', () => {
     expect(date.year).toBe(year);
     expect(date.dayOfYear).toBe(dayOfYear);
   });
-  // test invalid strings
+  // Test invalid strings
   test.each([
     ['243-01-01-01'], // Bad format
     ['bob'], // Bad format
@@ -262,7 +262,7 @@ describe('Calendar.dateFromParts', () => {
       new Month('Month 2', 'M2', 22),
       new Month('Month 3', 'M3', 33)]
   });
-  // test valid parts
+  // Test valid parts
   test.each([
     // year, month, day, expectedDayOfYear
     [243, 1, 1, 1],
@@ -277,7 +277,7 @@ describe('Calendar.dateFromParts', () => {
     expect(date.year).toBe(year);
     expect(date.dayOfYear).toBe(expectedDayOfYear);
   });
-  // test invalid parts
+  // Test invalid parts
   test.each([
     // year, month, day, error text
     ['bob', 1, 1, 'Invalid year (bob)'],
@@ -363,5 +363,18 @@ describe('Calendar.dateStr', () => {
 
   it('should use the default format if none is provided', () => {
     expect(calendar.getDateStr()).toBe('0009<quack>Month 1<quack>00000042');
+  });
+});
+
+describe('Calendar.addAlarm', () => {
+  const calendar = new Calendar();
+  const alarm = new Alarm('Alarm 1', new DnDate(2000, 22), 'hello world');
+  it('should add an alarm to the calendar', () => {
+    calendar.addAlarm(alarm);
+    expect(calendar.alarms).toContain(alarm);
+  });
+  it('should throw an error if the alarm has a duplicate name', () => {
+    const duplicateAlarm = new Alarm('Alarm 1', new DnDate(444, 44), 'goodbye world');
+    expect(() => calendar.addAlarm(duplicateAlarm)).toThrow();
   });
 });
