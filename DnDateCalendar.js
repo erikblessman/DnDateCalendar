@@ -8,245 +8,7 @@ const DnDateCalendar = (() => {
   //TODO: suggestion: store logLevel in state and provide setters/getters
   let LOG_LEVEL = 'TRACE';
 
-  // #region STATE FUNCTIONS
-  const initState = function () {
-    try {
-      let calendarObj = state[scriptName];
-      if (!calendarObj) {
-        calendar = new Calendar();
-      } else if (calendar.schemaVersion != schemaVersion) {
-        updateCalendar(calendarObj);
-      } else {
-        calendar = new Calendar(calendarObj);
-      }
-      updateState();
-    } catch (e) {
-      showException(e, 'Error initializing state');
-    }
-  }
-
-  const updateState = function () {
-    state[scriptName] = calendar.toObj();
-  }
-
-  const updateCalendar = function ($oldCalendar) {
-    const msg = `Updating calendar from schema version ${$oldCalendar.schemaVersion} to ${schemaVersion}`;
-    whisper('gm', header('Updating Calendar Schema') + list([
-      `Old Version: ${$oldCalendar.schemaVersion}`,
-      `New Version: ${schemaVersion}`]));
-    log(`BEGINNING: ${msg}`);
-    if ($oldCalendar.schemaVersion == 0.1) {
-      const date = new DnDate($oldCalendar.year, $oldCalendar.dayOfYear);
-      const months = $oldCalendar?.months.map((m, i) => new Month(m.name, m.name.substring(0, 3), (i + 1).toString().padStart(2, '0'), m.days)) ?? defaultMonths;
-      const alarms = $oldCalendar?.alarms?.map(a => new Alarm(a.name, new DnDate(a.year, a.dayOfYear), a.message));
-      const newCalendar = new Calendar({ schemaVersion, date, months, alarms });
-      if (!newCalendar) {
-        whisper('gm', 'Failed to update calendar');
-        return;
-      }
-      calendar = new Calendar({ schemaVersion, date, months, alarms });
-    } else {
-      throw new Error(`Unknown schema version [${$oldCalendar.schemaVersion}]`);
-    }
-    whisper('gm', `COMPLETED: ${msg}`);
-  }
-  // #endregion STATE FUNCTIONS
-
-  // #region MESSAGE ROUTING
-  const isApiMsg = function ($msg) {
-    if (!$msg) {
-      return false;
-    }
-    if ($msg.type != "api") {
-      return false;
-    }
-    if (!$msg.content) {
-      return false;
-    }
-    if (!/^!dndate(\b\s|$)/.test($msg.content)) {
-      return false;
-    }
-    return true;
-  }
-
-  const routeMessage = function ($msg) {
-    trace('routeMessage', 1);
-    if ($msg.content == '!dndate') {
-      showCalendar();
-      return;
-    }
-    const args = $msg.content.split(' ');
-    args.shift(); // remove the !date arg
-    const command = args.shift();
-    switch (command) {
-      case 'alarms':
-        showAlarms();
-        return;
-      case 'alarm':
-        const command2 = args.shift();
-        switch (command2) {
-          case 'add': calendar.addAlarm(args); break;
-          case 'edit': calendar.editAlarm(args); break;
-          case 'delete': calendar.deleteAlarm(args); break;
-          case 'rename': calendar.renameAlarm(args); break;
-          default: throw new Error(`Unknown alarm command [${command2}]`);
-        }
-        showAlarms();
-        return;
-      case 'next':
-        calendar.addDays(1);
-        break;
-      case 'prev':
-        calendar.addDays(-1);
-        break;
-      case 'add':
-        calendar.addDays(args);
-        break;
-      case 'set':
-        calendar.setDate(args);
-        break;
-      case 'reset':
-        delete state[scriptName];
-        initState();
-        break;
-      case 'help':
-        const who = args.length > 0 ? args[0] : $msg.who;
-        showHelp(who);
-        return;
-      case 'logState':
-        log(JSON.stringify(state));
-        return;
-      case 'logLevel':
-        LOG_LEVEL = args.shift();
-        whisper('gm', `Log Level set to [${LOG_LEVEL}]`);
-        return;
-      case 'nuke':
-        delete state[scriptName];
-        whisper('gm', 'state nuked');
-        return;
-      default:
-        throw new Error(`Unknown command [${$msg.content}]`);
-    }
-    showCalendar();
-  };
-  // #endregion MESSAGE ROUTING
-
-  // #region SHOW/CHAT FUNCTIONS
-  const debug = function ($msg) {
-    ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && whisper('gm', $msg);
-  }
-  const trace = function ($method, $num) {
-    if (['TRACE'].includes(LOG_LEVEL)) {
-      whisper('gm', `${$method}:${$num}`);
-      log(`${$method}:${$num}`);
-    }
-  }
-  const whisper = function ($who, $content) {
-    const chatMessage = `/w ${$who} ${apiMessage($content)}`;
-    sendChat(scriptName, chatMessage);
-  }
-  const showCalendar = function ($who = 'gm') {
-    whisper($who, `${header(calendar.getDateStr())}`);
-  }
-  const showHelp = function ($who) {
-    const commands = [
-      ['!dndate', 'show the current date'],
-      ['!dndate next', '*advance the date by one day'],
-      ['!dndate prev', '*go back one day'],
-      ['!dndate add DAYS', '*add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
-      ['!dndate set DATE', '*set the date to the specified date'],
-      ['!dndate alarms', '*show this help message'],
-      ['!dndate alarm add|edit NAME DATE MESSAGE', '*add or edit an alarm'],
-      ['!dndate alarm rename OLDNAME NEWNAME', '*rename an alarm'],
-      ['!dndate reset', '*reset the date to the default'],
-      ['!dndate help [WHO]', 'show this help message (e.g. !dndate help William)'],
-    ];
-    whisper($who, header(`${scriptName} Help`) + table(commands));
-    const notes = [
-      '* Requires GM permissions',
-      'ARGS in [BRACKETS] are optional',
-      'Alternatives args are separated by | (as with !dndate alarm add|edit)',
-      'DATE is in the format YYYY-MM-DD or YYYY DOY',
-    ]
-    whisper($who, header('Help Notes') + list(notes));
-  }
-  const showException = function ($e, $msg) {
-    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
-    const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
-    log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
-    log('Message:');
-    log(JSON.stringify($msg));
-    log('Exception:');
-    log(JSON.stringify($e));
-    log("---------------- STATE ----------------");
-    log(JSON.stringify(state));
-    whisper('gm', header(`${scriptName} Error`) + errorStr);
-  }
-  const showAlarms = function () {
-    const alarms = calendar.alarms;
-    if (!alarms || alarms.length == 0) {
-      whisper('gm', header('Alarms') + 'No alarms set');
-      return;
-    }
-    const alarmRows = alarms.map(a => [a.name, calendar.dateStr(a.date), a.message]);
-    alarmRows.unshift(['Name', 'Date', 'Message']);
-    whisper('gm', header('Alarms') + table(alarmRows));
-  }
-  // #endregion CHAT FUNCTIONS
-
-  // #region HTML BUILDING FUNCTIONS
-  const apiMessage = function ($content) {
-    const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em; color: #333;';
-    return `<div style="${style}">${$content}</div>`;
-  }
-  const header = function ($txt) {
-    const style = 'font-size: 1.2em; font-weight: bold; text-align: center; color: #f66; padding: .2em 1em;';
-    return `<div style="${style}">${$txt}</div>`;
-  }
-  const table = function ($rows) {
-    return `<div style="display: table;">${$rows.map(r => row(r)).join('')}</div>`;
-  }
-  const row = function ($cells) {
-    return `<div style="display: table-row;">${$cells.map((c, i) => i == 0 ? headerCell(c) : cell(c)).join('')
-      }</div>`;
-  }
-  const headerCell = function ($content) {
-    return cell($content, 'font-weight: bold; color: #000;');
-  }
-  const cell = function ($content, $style) {
-    const baseStyle = 'display: table-cell; border: 1px solid #666; color: #333; padding: .2em .5em;';
-    return `<div style="${baseStyle} ${$style}">${$content}</div>`;
-  }
-  const list = function ($items) {
-    return `<ul>${$items.map(i => `<li>${i}</li>`).join('')}</ul>`;
-  }
-  // #endregion HTML BUILDING FUNCTIONS
-
-  // #region EVENT HANDLERS
-  const onChatMessage = function ($msg) {
-    try {
-      if (!isApiMsg($msg)) {
-        return;
-      }
-      routeMessage($msg);
-    } catch (e) {
-      showException(e, $msg);
-    }
-
-  };
-
-  const registerEventHandlers = function () {
-    on('chat:message', onChatMessage);
-  };
-
-  on("ready", () => {
-    registerEventHandlers();
-    initState();
-    log(`==> ${scriptName} v${version} Ready`);
-  });
-  // #endregion EVENT HANDLERS
-
-  // #region Schema ------------------------------------------------------------------------------------------------
+  // #region Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
   class Month {
     constructor(fullName, shortName, days) {
       this.#fullName = fullName;
@@ -576,6 +338,243 @@ const DnDateCalendar = (() => {
 
   // #endregion Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
 
+  // #region STATE FUNCTIONS
+  const initState = function () {
+    try {
+      let calendarObj = state[scriptName];
+      if (!calendarObj?.schemaVersion) {
+        calendar = new Calendar();
+      } else if (calendar?.schemaVersion != schemaVersion) {
+        updateCalendar(calendarObj);
+      } else {
+        calendar = new Calendar(calendarObj);
+      }
+      updateState();
+    } catch (e) {
+      showException(e, 'Error initializing state');
+    }
+  }
+
+  const updateState = function () {
+    state[scriptName] = calendar.toObj();
+  }
+
+  const updateCalendar = function ($oldCalendar) {
+    const msg = `Updating calendar from schema version ${$oldCalendar.schemaVersion} to ${schemaVersion}`;
+    whisper('gm', header('Updating Calendar Schema') + list([
+      `Old Version: ${$oldCalendar.schemaVersion}`,
+      `New Version: ${schemaVersion}`]));
+    log(`BEGINNING: ${msg}`);
+    if ($oldCalendar.schemaVersion == 0.1) {
+      const date = new DnDate($oldCalendar.year, $oldCalendar.dayOfYear);
+      const months = $oldCalendar?.months.map((m, i) => new Month(m.name, m.name.substring(0, 3), (i + 1).toString().padStart(2, '0'), m.days)) ?? defaultMonths;
+      const alarms = $oldCalendar?.alarms?.map(a => new Alarm(a.name, new DnDate(a.year, a.dayOfYear), a.message));
+      const newCalendar = new Calendar({ schemaVersion, date, months, alarms });
+      if (!newCalendar) {
+        whisper('gm', 'Failed to update calendar');
+        return;
+      }
+      calendar = new Calendar({ schemaVersion, date, months, alarms });
+    } else {
+      throw new Error(`Unknown schema version [${$oldCalendar.schemaVersion}]`);
+    }
+    whisper('gm', `COMPLETED: ${msg}`);
+  }
+  // #endregion STATE FUNCTIONS
+
+  // #region MESSAGE ROUTING
+  const isApiMsg = function ($msg) {
+    if (!$msg) {
+      return false;
+    }
+    if ($msg.type != "api") {
+      return false;
+    }
+    if (!$msg.content) {
+      return false;
+    }
+    if (!/^!dndate(\b\s|$)/.test($msg.content)) {
+      return false;
+    }
+    return true;
+  }
+
+  const routeMessage = function ($msg) {
+    if ($msg.content == '!dndate') {
+      showCalendar();
+      return;
+    }
+    const args = $msg.content.split(' ');
+    args.shift(); // remove the !date arg
+    const command = args.shift();
+    switch (command) {
+      case 'alarms':
+        showAlarms();
+        return;
+      case 'alarm':
+        const command2 = args.shift();
+        switch (command2) {
+          case 'add': calendar.addAlarm(args); break;
+          case 'edit': calendar.editAlarm(args); break;
+          case 'delete': calendar.deleteAlarm(args); break;
+          case 'rename': calendar.renameAlarm(args); break;
+          default: throw new Error(`Unknown alarm command [${command2}]`);
+        }
+        showAlarms();
+        return;
+      case 'next':
+        calendar.addDays(1);
+        break;
+      case 'prev':
+        calendar.addDays(-1);
+        break;
+      case 'add':
+        calendar.addDays(args);
+        break;
+      case 'set':
+        calendar.setDate(args);
+        break;
+      case 'reset':
+        delete state[scriptName];
+        initState();
+        break;
+      case 'help':
+        const who = args.length > 0 ? args[0] : $msg.who;
+        showHelp(who);
+        return;
+      case 'logState':
+        log(JSON.stringify(state));
+        return;
+      case 'logLevel':
+        LOG_LEVEL = args.shift();
+        whisper('gm', `Log Level set to [${LOG_LEVEL}]`);
+        return;
+      case 'nuke':
+        delete state[scriptName];
+        whisper('gm', 'state nuked');
+        return;
+      default:
+        throw new Error(`Unknown command [${$msg.content}]`);
+    }
+    showCalendar();
+  };
+  // #endregion MESSAGE ROUTING
+
+  // #region SHOW/CHAT FUNCTIONS
+  const debug = function ($msg) {
+    ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && whisper('gm', $msg);
+  }
+  const trace = function ($method, $num) {
+    if (['TRACE'].includes(LOG_LEVEL)) {
+      whisper('gm', `${$method}:${$num}`);
+      log(`${$method}:${$num}`);
+    }
+  }
+  const whisper = function ($who, $content) {
+    const chatMessage = `/w ${$who} ${apiMessage($content)}`;
+    sendChat(scriptName, chatMessage);
+  }
+  const showCalendar = function ($who = 'gm') {
+    whisper($who, `${header(calendar.getDateStr())}`);
+  }
+  const showHelp = function ($who) {
+    const commands = [
+      ['!dndate', 'show the current date'],
+      ['!dndate next', '*advance the date by one day'],
+      ['!dndate prev', '*go back one day'],
+      ['!dndate add DAYS', '*add the specified number of days to the date (e.g. !dndate add 5 OR !dndate add -45)'],
+      ['!dndate set DATE', '*set the date to the specified date'],
+      ['!dndate alarms', '*show this help message'],
+      ['!dndate alarm add|edit NAME DATE MESSAGE', '*add or edit an alarm'],
+      ['!dndate alarm rename OLDNAME NEWNAME', '*rename an alarm'],
+      ['!dndate reset', '*reset the date to the default'],
+      ['!dndate help [WHO]', 'show this help message (e.g. !dndate help William)'],
+    ];
+    whisper($who, header(`${scriptName} Help`) + table(commands));
+    const notes = [
+      '* Requires GM permissions',
+      'ARGS in [BRACKETS] are optional',
+      'Alternatives args are separated by | (as with !dndate alarm add|edit)',
+      'DATE is in the format YYYY-MM-DD or YYYY DOY',
+    ]
+    whisper($who, header('Help Notes') + list(notes));
+  }
+  const showException = function ($e, $msg) {
+    const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
+    const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
+    log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
+    log('Message:');
+    log(JSON.stringify($msg));
+    log('Exception:');
+    log(JSON.stringify($e));
+    log("---------------- STATE ----------------");
+    log(JSON.stringify(state));
+    whisper('gm', header(`${scriptName} Error`) + errorStr);
+  }
+  const showAlarms = function () {
+    const alarms = calendar.alarms;
+    if (!alarms || alarms.length == 0) {
+      whisper('gm', header('Alarms') + 'No alarms set');
+      return;
+    }
+    const alarmRows = alarms.map(a => [a.name, calendar.dateStr(a.date), a.message]);
+    alarmRows.unshift(['Name', 'Date', 'Message']);
+    whisper('gm', header('Alarms') + table(alarmRows));
+  }
+  // #endregion CHAT FUNCTIONS
+
+  // #region HTML BUILDING FUNCTIONS
+  const apiMessage = function ($content) {
+    const style = 'border:1px solid black; background-color: #fee; padding: .2em; border-radius:.4em; color: #333;';
+    return `<div style="${style}">${$content}</div>`;
+  }
+  const header = function ($txt) {
+    const style = 'font-size: 1.2em; font-weight: bold; text-align: center; color: #f66; padding: .2em 1em;';
+    return `<div style="${style}">${$txt}</div>`;
+  }
+  const table = function ($rows) {
+    return `<div style="display: table;">${$rows.map(r => row(r)).join('')}</div>`;
+  }
+  const row = function ($cells) {
+    return `<div style="display: table-row;">${$cells.map((c, i) => i == 0 ? headerCell(c) : cell(c)).join('')
+      }</div>`;
+  }
+  const headerCell = function ($content) {
+    return cell($content, 'font-weight: bold; color: #000;');
+  }
+  const cell = function ($content, $style) {
+    const baseStyle = 'display: table-cell; border: 1px solid #666; color: #333; padding: .2em .5em;';
+    return `<div style="${baseStyle} ${$style}">${$content}</div>`;
+  }
+  const list = function ($items) {
+    return `<ul>${$items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+  }
+  // #endregion HTML BUILDING FUNCTIONS
+
+  // #region EVENT HANDLERS
+  const onChatMessage = function ($msg) {
+    try {
+      if (!isApiMsg($msg)) {
+        return;
+      }
+      routeMessage($msg);
+    } catch (e) {
+      showException(e, $msg);
+    }
+
+  };
+
+  const registerEventHandlers = function () {
+    on('chat:message', onChatMessage);
+  };
+
+  on("ready", () => {
+    registerEventHandlers();
+    initState();
+    log(`==> ${scriptName} v${version} Ready`);
+  });
+  // #endregion EVENT HANDLERS
+
   // #region DEFAULTS
   // Default calendar is the Gregorian calendar, minus leapday/leapyear shenannigans (for simplicity)
   const defaultMonths = [
@@ -593,4 +592,5 @@ const DnDateCalendar = (() => {
     new Month('December', 'Dec', '12', 31),
   ];
   // #endregion DEFAULTS
+
 })();
