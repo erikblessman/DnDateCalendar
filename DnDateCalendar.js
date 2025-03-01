@@ -5,28 +5,28 @@ const DnDateCalendar = (() => {
   const schemaVersion = 1;
   //TODO: suggestion use javascript get/set keywords for the calendar
   let calendar = null;
-  //TODO: suggestion: store logLevel in state and provede setters/getters
-  let LOG_LEVEL = 'WARN';
+  //TODO: suggestion: store logLevel in state and provide setters/getters
+  let LOG_LEVEL = 'TRACE';
 
   // #region STATE FUNCTIONS
   const initState = function () {
     try {
-      calendar = state[scriptName];
-      if (!calendar) {
-        calendar = new Calendar(schemaVersion, defaultDate, defaultMonths, defaultAlarms);
-        updateState();
+      let calendarObj = state[scriptName];
+      if (!calendarObj) {
+        calendar = new Calendar();
       } else if (calendar.schemaVersion != schemaVersion) {
-        updateCalendar(calendar) && updateState()
+        updateCalendar(calendarObj);
       } else {
-        calendar = Calendar.fromState(calendar);
+        calendar = new Calendar(calendarObj);
       }
+      updateState();
     } catch (e) {
       showException(e, 'Error initializing state');
     }
   }
 
   const updateState = function () {
-    state[scriptName] = calendar;
+    state[scriptName] = calendar.toObj();
   }
 
   const updateCalendar = function ($oldCalendar) {
@@ -39,12 +39,12 @@ const DnDateCalendar = (() => {
       const date = new DnDate($oldCalendar.year, $oldCalendar.dayOfYear);
       const months = $oldCalendar?.months.map((m, i) => new Month(m.name, m.name.substring(0, 3), (i + 1).toString().padStart(2, '0'), m.days)) ?? defaultMonths;
       const alarms = $oldCalendar?.alarms?.map(a => new Alarm(a.name, new DnDate(a.year, a.dayOfYear), a.message));
-      const newCalendar = new Calendar(schemaVersion, date, months, alarms);
+      const newCalendar = new Calendar({ schemaVersion, date, months, alarms });
       if (!newCalendar) {
         whisper('gm', 'Failed to update calendar');
         return;
       }
-      calendar = new Calendar(schemaVersion, date, months, alarms);
+      calendar = new Calendar({ schemaVersion, date, months, alarms });
     } else {
       throw new Error(`Unknown schema version [${$oldCalendar.schemaVersion}]`);
     }
@@ -94,13 +94,13 @@ const DnDateCalendar = (() => {
         showAlarms();
         return;
       case 'next':
-        calendar.addDay(1);
+        calendar.addDays(1);
         break;
       case 'prev':
-        calendar.addDay(-1);
+        calendar.addDays(-1);
         break;
       case 'add':
-        calendar.addDay(args);
+        calendar.addDays(args);
         break;
       case 'set':
         calendar.setDate(args);
@@ -114,12 +114,16 @@ const DnDateCalendar = (() => {
         showHelp(who);
         return;
       case 'logState':
-        log(JSON.stringify(state[scriptName]));
+        log(JSON.stringify(state));
         return;
       case 'logLevel':
         LOG_LEVEL = args.shift();
         whisper('gm', `Log Level set to [${LOG_LEVEL}]`);
-        return;;
+        return;
+      case 'nuke':
+        delete state[scriptName];
+        whisper('gm', 'state nuked');
+        return;
       default:
         throw new Error(`Unknown command [${$msg.content}]`);
     }
@@ -132,14 +136,17 @@ const DnDateCalendar = (() => {
     ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && whisper('gm', $msg);
   }
   const trace = function ($method, $num) {
-    ['TRACE'].includes(LOG_LEVEL) && whisper('gm', `${$method}:${$num}`);
+    if (['TRACE'].includes(LOG_LEVEL)) {
+      whisper('gm', `${$method}:${$num}`);
+      log(`${$method}:${$num}`);
+    }
   }
   const whisper = function ($who, $content) {
     const chatMessage = `/w ${$who} ${apiMessage($content)}`;
     sendChat(scriptName, chatMessage);
   }
   const showCalendar = function ($who = 'gm') {
-    whisper($who, `${header(calendar.dateStr())}`);
+    whisper($who, `${header(calendar.getDateStr())}`);
   }
   const showHelp = function ($who) {
     const commands = [
@@ -167,10 +174,12 @@ const DnDateCalendar = (() => {
     const errorStyle = `margin: .1em 1em 1em 1em; font-size: 1em; color: #333; text-align: center;`;
     const errorStr = `<div style="${errorStyle}">${$e?.message ?? 'Unknown Error'}</div>`;
     log(`>>>>>>>>>>>>>>>>> ${scriptName} Error <<<<<<<<<<<<<<<<<`);
-    log('Exception:');
-    log(JSON.stringify($e));
     log('Message:');
     log(JSON.stringify($msg));
+    log('Exception:');
+    log(JSON.stringify($e));
+    log("---------------- STATE ----------------");
+    log(JSON.stringify(state));
     whisper('gm', header(`${scriptName} Error`) + errorStr);
   }
   const showAlarms = function () {
@@ -237,275 +246,338 @@ const DnDateCalendar = (() => {
   });
   // #endregion EVENT HANDLERS
 
-  // #region Schema
+  // #region Schema ------------------------------------------------------------------------------------------------
   class Month {
-    constructor($fullName, $shortName, $numericName, $days) {
-      this.fullName = $fullName; // string, e.g. 'January'
-      this.shortName = $shortName; // string, e.g. 'Jan'
-      this.numericName = $numericName; // string, e.g. '01'
-      this.days = $days; // integer, number of days in the month
+    constructor(fullName, shortName, days) {
+      this.#fullName = fullName;
+      this.#shortName = shortName;
+      this.#days = days;
     }
+
+    #fullName;
+    get fullName() { return this.#fullName; }
+
+    #shortName;
+    get shortName() { return this.#shortName; }
+
+    #days;
+    get days() { return this.#days; }
   }
 
   class DnDate {
-    constructor($year, $dayOfYear) {
-      this.year = $year; // integer
-      this.dayOfYear = $dayOfYear; // integer, 1-based
+    constructor(year, dayOfYear) {
+      this.year = year;
+      this.dayOfYear = dayOfYear;
     }
+
+    year;
+    dayOfYear;
   }
 
   class Alarm {
-    constructor($name, $date, $message) {
-      this.name = $name; // string, unique
-      this.date = $date; // DnDate
-      this.message = $message; // string, optional
+    constructor(name, date, message) {
+      this.name = name;
+      this.date = date;
+      this.message = message;
     }
   }
 
   class Calendar {
-    // #region CREATTION
-    constructor($schemaVersion = schemaVersion, $date = { ...defaultDate }, $months = [...defaultMonths], $alarms = [], $format = defaultFormat) {
-      this.schemaVersion = $schemaVersion; // MAJOR.MINOR.REVISION
-      this.date = $date; // DnDate
-      this.months = $months; // array of Month objects
-      this.alarms = $alarms; // array of Alarm objects
-      this.format = $format; // string, date format
-    }
-    static fromState($state) {
-      return new Calendar($state.schemaVersion, $state.date, $state.months, $state.alarms, $state.format);
-    }
-    // #endregion CREATTION
-
-    // #region GETTERS
-    date() {
-      return this.date;
-    }
-    months() {
-      return this.months;
-    }
-    alarms() {
-      return this.alarms;
-    }
-    daysInYear() {
-      return this.months.reduce((acc, month) => acc + month?.days ?? 0, 0);
-    }
-    // #endregion GETTERS
-
-    // #region DATE FUNCTIONS
-    addDay = function ($days) {
-      trace('addDay', 1);
-      if (isNaN($days)) {
-        throw new Error(`Invalid number of days [${$days}]`);
-      }
-      this.date = this.addDays($days, this.date);
-      updateState();
-    }
-
-    /**
-     * Adds the specified number of days to the date
-     * @param {number} $days the number of days to add (use negative numbers to subtract)
-     * @param {*} $date the date to add days to
-     * @returns a new DnDate object with the specified number of days added
-     */
-    addDays($days, $date = this.date) {
-      trace('addDays', 1);
-      const days = parseInt($days);
-      if (isNaN(days)) {
-        throw new Error(`Invalid number of days [${$days}]`);
-      }
-      let dayOfYear = $date.dayOfYear + days;
-      let year = $date.year;
-      const daysInYear = this.daysInYear();
-
-      if (dayOfYear > daysInYear) {
-        const yearsToAdd = Math.floor(dayOfYear / daysInYear);
-        dayOfYear -= yearsToAdd * daysInYear;
-        year += yearsToAdd;
-      } else if (dayOfYear < 1) {
-        const yearsToRemove = Math.ceil(Math.abs(dayOfYear) / daysInYear);
-        dayOfYear += yearsToRemove * daysInYear;
-        year -= yearsToRemove;
-      }
-      return new DnDate(year, dayOfYear);
-    }
-    setDate($args) {
-      trace('setDate', 1);
-      // TODO: suggestion const [date,] = this.parseDateArgs($args);
-      const [date, ...remainingArgs] = this.parseDateArgs($args);
-      this.date = date;
-      updateState();
-    }
-    dateStr($date = this.date, $format = 'YYYY-MM-DD') {
-      trace('dateStr', 1);
-      if ($format == 'YYYY DOY') {
-        return `${$date.year} ${$date.dayOfYear}`;
-      }
-      const info = this.dateInfo($date);
-      switch ($format) {
-        case 'YYYY-MM-DD':
-          return `${info.year}-${info.month.numericName}-${info.day.toString().padStart(2, '0')}`;
-        case 'MM/DD/YYYY':
-          return `${info.month.numericName}/${info.day}/${info.year}`;
-        case 'DD MMM YYYY':
-          return `${info.day} ${info.month.shortName} ${info.year}`;
-        case 'DD MMMM YYYY':
-          return `${info.day} ${info.month.fullName} ${info.year}`;
-        default:
-          throw new Error(`Unknown date format [${$format}]`);
-      }
-    }
-    dateFromParts($year, $month, $day) {
-      trace('dateFromParts', 1);
-      const months = this.months.slice(0, $month - 2);
-      const dayOfYear = months.reduce((acc, month) => acc + month.days, 0) + $day;
-      debug(`dateFromParts(${$year}, ${$month}, ${$day}) => dayOfYear: ${dayOfYear}`);
-      return new DnDate($year, dayOfYear);
-    }
-    dateFromStr($str) {
-      trace('dateFromStr', 1);
-      // Check for YYYY-MM-DD format
-      let matches = /^(\d+)[-/.](\d+)[-/.](\d+)$/.exec($str);
-      if (matches) {
-        matches.shift();// remove the full match
-        const year = parseInt(matches.shift());
-        const month = parseInt(matches.shift());
-        const day = parseInt(matches.shift());
-        const date = this.dateFromParts(year, month, day);
-        if (date.dayOfYear < 1 || date.dayOfYear > this.daysInYear()) {
-          throw new Error(`Invalid day of year [${dayOfYear}]`);
-        }
-        return date;
-      } else {
-        throw new Error(`Unknown date format [${$str}] ... expected YYYY-MM-DD`);
-      }
-    }
-    /**
-     * Gets calendar info for the specified date
-     * @param {DnDate} $date the date to get the info for (DEFAULT: this.date)
-     * @returns an object wit the day (of the month), the month object, and year
-     */
-    dateInfo($date = this.date) {
-      trace('dateInfo', 1);
-      let year = $date.year;
-      let dayOfYear = $date.dayOfYear;
-      let months = this.months;
-      if (dayOfYear < 1) {
-        throw new Error(`Invalid dayOfYear(${dayOfYear})`);
-      }
-      let dayOfMonth = dayOfYear;
-      let monthIndex = 0;
-      while (dayOfMonth > months[monthIndex].days) {
-        dayOfMonth -= months[monthIndex++].days;
-        if (monthIndex >= months.length) {
-          monthIndex = 0;
-          ++year;
-        }
-      }
+    // #region static
+    static getDefaultParms() {
       return {
-        day: dayOfMonth,
-        month: months[monthIndex],
-        year: year
+        schemaVersion: 0,
+        months: [
+          new Month('January', 'Jan', '01', 31),
+          new Month('February', 'Feb', '02', 28),
+          new Month('March', 'Mar', '03', 31),
+          new Month('April', 'Apr', '04', 30),
+          new Month('May', 'May', '05', 31),
+          new Month('June', 'Jun', '06', 30),
+          new Month('July', 'Jul', '07', 31),
+          new Month('August', 'Aug', '08', 31),
+          new Month('September', 'Sep', '09', 30),
+          new Month('October', 'Oct', '10', 31),
+          new Month('November', 'Nov', '11', 30),
+          new Month('December', 'Dec', '12', 31),
+        ],
+        date: new DnDate(1, 1),
+        format: 'YYYY-MMM-DD',
+        alarms: [],
+      };
+    };
+    // #endregion static
+
+    // #region construction
+    /***
+     * @param {object} parms - Valid properties are:
+     * - schemaVersion: number (default 0)
+     * - months: array of Month objects (default January - December)
+     * - date: DnDate object (default year: 1, dayOfYear: 1)
+     * - format: string (default 'YYYY-MM-DD')
+     * - alarms: array of Alarm objects (default [])
+     * @returns {Calendar}
+     */
+    constructor(parms) {
+      parms = { ...Calendar.getDefaultParms(), ...parms };
+      this.#schemaVersion = parms.schemaVersion;
+      this.#date = parms.date;
+      this.#format = parms.format;
+      this.#alarms = parms.alarms;
+
+      // freeze the months array and each month object
+      this.#months = parms.months;
+      this.#months.forEach(month => Object.freeze(month));
+      Object.freeze(this.#months);
+
+      // Calculate the days in the year based on the months
+      this.#daysInYear = this.#months.reduce((acc, month) => acc + month.days, 0);
+    }
+    // #endregion constructor
+
+    toObj() {
+      return {
+        schemaVersion: this.schemaVersion,
+        date: this.date,
+        format: this.format,
+        alarms: this.alarms,
+        months: this.months,
       };
     }
-    parseDateArgs($args) {
-      trace('parseDateArgs', 1);
-      const args = [...$args];
-      let arg = args.shift();
-      let date;
-      if (isNaN(arg)) {
-        trace('parseDateArgs', 2);
-        date = this.dateFromStr(arg);
-        trace('parseDateArgs', 3);
-      } else {
-        trace('parseDateArgs', 4);
-        const year = parseInt(arg);
-        arg = args.shift();
-        if (isNaN(arg)) {
-          throw new Error(`Invalid date args: [${$args.join(', ')}]`);
+
+    // #region properties/getters
+    #schemaVersion;
+    get schemaVersion() { return this.#schemaVersion; }
+
+    #months;
+    get months() { return this.#months; }
+
+    #date;
+    get date() { return this.#date; }
+
+    #format;
+    get format() { return this.#format; }
+
+    #alarms;
+    get alarms() { return this.#alarms; }
+
+    #daysInYear;
+    get daysInYear() { return this.#daysInYear; }
+
+    get month() {
+      if (this.#date.dayOfYear < 1 || this.#date.dayOfYear > this.#daysInYear) {
+        return null;
+      }
+      let days = 0;
+      for (let i = 0; i < this.#months.length; i++) {
+        const month = this.#months[i];
+        days += month.days;
+        if (this.#date.dayOfYear <= days) {
+          return month;
         }
-        const dayOfYear = parseInt(arg);
-        date = new DnDate(year, dayOfYear);
-        trace('parseDateArgs', 5);
       }
-      debug(`Parsed date: ${JSON.stringify(date)}`);
-      if (date.dayOfYear < 1 || date.dayOfYear > this.daysInYear()) {
-        throw new Error(`Invalid day of year [${dayOfYear}]`);
-      }
-      return [date, args];
-    }
-    // #endregion DATE FUNCTIONS
-
-    // #region ALARM FUNCTIONS
-    parseAlarmArgs = function ($args) {
-      trace('parseAlarmArgs', 1);
-      if ($args.length < 2) {
-        throw new Error(`Not enough arguments for alarm: [${$args.join(', ')}]`);
-      }
-      const args = [...$args];
-      const name = args.shift();
-      const [date, ...remainingArgs] = this.parseDateArgs(args);
-      const message = remainingArgs.join(' ');
-      return { name, date, message };
+      return null;
     }
 
-    addAlarm = function ($args) {
-      trace(`addAlarm(${$args})`, 1);
-      const alarm = this.parseAlarmArgs($args);
-      if (this.alarms.find(a => a.name == alarm.name)) {
-        throw new Error(`An alarm with the name [${alarm.name}] already exists`);
+    /**
+     * Formats the current date as a string.
+     * @param {string} format The format you want the date in (default: this.format)
+     *  Use the following placeholders: DOY, YYYY, MM, DD, Month, Mon.
+     * For YYYY and DD, you can increase the number of characters to pad with zeros.
+     * DOY is the day of the year (1-number of days in the year).
+     * YYYY is the year.
+     * MM is the month number (1-12).
+     * DD is the day of the month.
+     * Month is the full month name.
+     * Mon is the short month name.
+     * Aside from these placeholders, the format string can contain any other characters.
+     * @returns 
+     */
+    getDateStr(format = this.#format) {
+      // year replacements
+      let str = format.replaceAll('DOY', this.#date.dayOfYear.toString());
+      str = str.replaceAll(/Y+/g, str => this.#date.year.toString().padStart(str.length, '0'));
+
+      // day replacements
+      const parts = this.getDateParts();
+      str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
+
+      // month replacements
+      const longNamePH = '^^^^';
+      const shortNamePH = ';;;;';
+      str = str.replaceAll('Month', longNamePH);
+      str = str.replaceAll('Mon', shortNamePH);
+      const monthNum = parseInt(parts.monthIndex) + 1;
+      str = str.replaceAll(/M+/g, str => monthNum.toString().padStart(str.length, '0'));
+      str = str.replaceAll(longNamePH, parts.month.fullName);
+      str = str.replaceAll(shortNamePH, parts.month.shortName);
+      return str;
+    }
+    // #endregion properties/getters
+
+    // #region mutators
+    /***
+     * Adds (or subtracts) the specified number of days to the current date.
+     * @param {number} days - The number of days to add (or subtract) to the current date. (Use negative numbers to subtract days.)
+     */
+    addDays(days) {
+      days = Number(days);
+      if (days > 0) {
+        let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
+        const yearsToAdd = Math.floor(daysFromBeginningOfCurrentYear / this.#daysInYear);
+        this.#date.year += yearsToAdd;
+        this.#date.dayOfYear = daysFromBeginningOfCurrentYear % this.#daysInYear;
+      } else if (days < 0) {
+        let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
+        if (daysFromBeginningOfCurrentYear < 1) {
+          const yearsToSubtract = Math.floor(Math.abs(daysFromBeginningOfCurrentYear) / this.#daysInYear) + 1;
+          this.#date.year -= yearsToSubtract;
+          daysFromBeginningOfCurrentYear = this.#daysInYear - (Math.abs(daysFromBeginningOfCurrentYear) % this.#daysInYear);
+        }
+        this.#date.dayOfYear = daysFromBeginningOfCurrentYear;
       }
-      this.alarms.push(alarm);
-      updateState();
     }
 
-    editAlarm = function ($args) {
-      trace('editAlarm', 1);
-      const alarm = this.parseAlarmArgs($args);
-      const existing = this.alarms.find(a => a.name == alarm.name);
-      if (!existing) {
-        throw new Error(`No alarm with the name [${alarm.name}] exists`);
+    /***
+     * Sets the current date to the specified date.
+     * @param {DnDate|string} date - The date to set.
+     */
+    setDate(date) {
+      let newDate;
+      if (date instanceof DnDate) {
+        if (date.dayOfYear < 1 || date.dayOfYear > this.#daysInYear) {
+          throw new Error(`Invalid day of year (${date.dayOfYear})`);
+        }
+        newDate = new DnDate(date.year, date.dayOfYear);
+      } else if (typeof date === 'string') {
+        newDate = this.parseDateStr(date);
+      } else {
+        throw new Error('date must be a DnDate object or a string');
       }
-      existing.date = alarm.date;
-      existing.message = alarm.message;
-      updateState();
+      this.#date = newDate;
     }
 
-    deleteAlarm = function ($args) {
-      trace('deleteAlarm', 1);
-      if ($args.length < 1) {
-        throw new Error(`No alarm name specified`);
+    addAlarm(alarm) {
+      if (this.#alarms.find(a => a.name === alarm.name)) {
+        throw new Error(`Alarm with name ${alarm.name} already exists`);
       }
-      const name = $args.shift();
-      const index = this.alarms.findIndex(a => a.name == name);
-      if (index < 0) {
-        throw new Error(`No alarm with the name [${name}] exists`);
-      }
-      this.alarms.splice(index, 1);
-      updateState();
+      this.#alarms.push(alarm);
     }
 
-    renameAlarm = function ($args) {
-      trace('renameAlarm', 1);
-      if ($args.length < 2) {
-        throw new Error(`Not enough arguments for alarm rename: [${$args.join(', ')}]`);
+    editAlarm(name, newAlarm) {
+      const alarmIndex = this.#alarms.findIndex(a => a.name === name);
+      if (alarmIndex === -1) {
+        throw new Error(`Alarm with name ${name} not found`);
       }
-      const oldName = $args.shift();
-      const newName = $args.shift();
-      const alarm = this.alarms.find(a => a.name == oldName);
-      if (!alarm) {
-        throw new Error(`No alarm with the name [${oldName}] exists`);
-      }
-      if (this.alarms.find(a => a.name == newName)) {
-        throw new Error(`An alarm with the name [${newName}] already exists`);
-      }
-      alarm.name = newName;
-      updateState();
+      this.#alarms[alarmIndex] = newAlarm;
     }
-    // #endregion ALARM FUNCTIONS
+
+    removeAlarm(name) {
+      const alarmIndex = this.#alarms.findIndex(a => a.name === name);
+      if (alarmIndex === -1) {
+        throw new Error(`Alarm with name ${name} not found`);
+      }
+      this.#alarms.splice(alarmIndex, 1);
+    }
+    // #endregion mutators
+
+    // #region utility methods
+    /***
+     * Parses a date string into a DnDate object.
+     * @param {string} str - The date string to parse.  Valid formats are: YYYY-DOY, YYYY-MM-DD, or YYYY-Mmm-DD
+     * @returns {DnDate} - The parsed date object.
+     */
+    parseDateStr(str) {
+      if (!str) {
+        throw new Error('no date string provided');
+      }
+      if (typeof str !== 'string') {
+        throw new Error('date string must be a string');
+      }
+
+      // Parsing format YYYY-DOY
+      if (str.match(/^\d+-\d+$/)) {
+        const [year, dayOfYear] = str.split('-');
+        const y = parseInt(year);
+        const d = parseInt(dayOfYear);
+        if (d < 1 || d > this.#daysInYear) {
+          throw new Error(`Invalid day of year (${dayOfYear})`);
+        }
+        return new DnDate(y, d);
+      }
+
+      // Parsing format YYYY-MM-DD
+      if (str.match(/^\d+-\d+-\d+$/)) {
+        return this.dateFromParts(...str.split('-'));
+      }
+
+      // Parsing format YYYY-Mmm-DD
+      if (str.match(/^\d+-.+-\d+$/)) {
+        const [year, month, day] = str.split('-');
+        let mIndex = this.#months.findIndex(m => m.fullName.toLowerCase() === month.toLowerCase());
+        if (mIndex === -1) {
+          mIndex = this.#months.findIndex(m => m.shortName.toLowerCase() === month.toLowerCase());
+        }
+        if (mIndex === -1) {
+          throw new Error(`Invalid month (${month})`);
+        }
+        const monthObj = this.#months[mIndex];
+        const y = parseInt(year);
+        const m = mIndex + 1;
+        const d = parseInt(day);
+        if (d < 1 || d > monthObj.days) {
+          throw new Error(`Invalid day (${day})`);
+        }
+        return this.dateFromParts(y, m, d);
+      }
+
+      throw new Error(`Invalid date string (${str}).  Use one of the following formats: YYYY-DOY, YYYY-MM-DD, or YYYY-Mmm-DD`);
+    }
+
+    /***
+     * Creates a DnDate object from the specified year, month, and day.
+     * @param {number} year - The year of the date.
+     * @param {number} month - The month of the date.
+     * @param {number} day - The day of the date.
+     * @returns {DnDate} - The date object.
+     */
+    dateFromParts(year, month, day) {
+      const y = parseInt(year);
+      if (isNaN(y)) {
+        throw new Error(`Invalid year (${year})`);
+      }
+      const m = parseInt(month);
+      if (isNaN(m) || m < 1 || m > this.#months.length) {
+        throw new Error(`Invalid month (${month})`);
+      }
+      const mObj = this.#months[m - 1];
+      const d = parseInt(day);
+      if (isNaN(d) || d < 1 || d > mObj.days) {
+        throw new Error(`Invalid day (${day})`);
+      }
+      return new DnDate(y, this.#months.slice(0, m - 1).reduce((acc, month) => acc + month.days, 0) + d);
+    }
+
+    /***
+     * Returns the month, monthIndex, and day of month for the current date.
+     */
+    getDateParts() {
+      let days = this.#date.dayOfYear;
+      for (let i = 0; i < this.#months.length; i++) {
+        const month = this.#months[i];
+        if (days <= month.days) {
+          return { month: month, monthIndex: i, dayOfMonth: days };
+        }
+        days -= month.days;
+      }
+    }
+    // #endregion utility methods
   }
-  // #endregion Schema
+
+  // #endregion Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
 
   // #region DEFAULTS
+  // Default calendar is the Gregorian calendar, minus leapday/leapyear shenannigans (for simplicity)
   const defaultMonths = [
     new Month('January', 'Jan', '01', 31),
     new Month('February', 'Feb', '02', 28),
@@ -520,8 +592,5 @@ const DnDateCalendar = (() => {
     new Month('November', 'Nov', '11', 30),
     new Month('December', 'Dec', '12', 31),
   ];
-  const defaultDate = new DnDate(1, 1);
-  const defaultAlarms = [];
-  const defaultFormat = 'YYYY-MM-DD';
   // #endregion DEFAULTS
 })();
