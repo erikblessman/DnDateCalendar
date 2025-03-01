@@ -4,7 +4,8 @@
   "description": "DnDateCalendar provides a configurable calendar with alarms for Roll20 API Scripts",
   "main": "DnDateCalendar.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "testw": "jest --watch"
   },
   "repository": {
     "type": "git",
