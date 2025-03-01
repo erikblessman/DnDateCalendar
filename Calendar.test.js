@@ -378,3 +378,45 @@ describe('Calendar.addAlarm', () => {
     expect(() => calendar.addAlarm(duplicateAlarm)).toThrow();
   });
 });
+
+describe('Calendar.editAlarm', () => {
+  let calendar, oldAlarm;
+  beforeEach(() => {
+    oldAlarm = new Alarm('caterpillar', new DnDate(2000, 22), 'hello world');
+    calendar = new Calendar({ alarms: [oldAlarm] });
+  });
+
+  it('should edit an existing alarm', () => {
+    const newAlarm = new Alarm('butterfly', new DnDate(444, 44), 'goodbye world');
+    calendar.editAlarm(oldAlarm.name, newAlarm);
+    const alarm = calendar.alarms[0];
+    expect(alarm.name).toBe('butterfly');
+    expect(alarm.date).toBe(newAlarm.date);
+    expect(alarm.message).toBe(newAlarm.message);
+  });
+
+  it('should throw an error if the alarm does not exist', () => {
+    const newAlarm = new Alarm('butterfly', new DnDate(444, 44), 'goodbye world');
+    expect(() => calendar.editAlarm('nonexistent', newAlarm)).toThrow();
+  });
+});
+
+describe('Calendar.removeAlarm', () => {
+  let calendar, alarm1, alarm2;
+  beforeEach(() => {
+    alarm1 = new Alarm('caterpillar', new DnDate(2000, 22), 'goodbye old world');
+    alarm2 = new Alarm('butterfly', new DnDate(2000, 44), 'hello new world');
+    calendar = new Calendar({ alarms: [alarm1, alarm2] });
+  });
+
+  it('should remove an existing alarm', () => {
+    expect(calendar.alarms.length).toBe(2);
+    calendar.removeAlarm(alarm1.name);
+    expect(calendar.alarms.length).toBe(1);
+    expect(calendar.alarms.findIndex(a => a.name === alarm1.name)).toBe(-1);
+  });
+
+  it('should throw an error when the named alarm does not exist', () => {
+    expect(() => calendar.removeAlarm('ASDFASFDASFDASFDASFD')).toThrow();
+  })
+});

@@ -1,3 +1,4 @@
+// BEGIN COPY - Copy everything below this line and above the "// END COPY" line below and paste it into the "Schema" region of DnDateCalendar.js
 class Month {
   constructor(fullName, shortName, days) {
     this.#fullName = fullName;
@@ -53,7 +54,7 @@ class Calendar {
         new Month('December', 'Dec', '12', 31),
       ],
       date: new DnDate(1, 1),
-      format: 'YYYY-MM-DD',
+      format: 'YYYY-Mon-DD',
       alarms: [],
     };
   };
@@ -85,6 +86,16 @@ class Calendar {
     this.#daysInYear = this.#months.reduce((acc, month) => acc + month.days, 0);
   }
   // #endregion constructor
+
+  toObj() {
+    return {
+      schemaVersion: this.schemaVersion,
+      date: this.date,
+      format: this.format,
+      alarms: this.alarms,
+      months: this.months,
+    };
+  }
 
   // #region properties/getters
   #schemaVersion;
@@ -162,13 +173,14 @@ class Calendar {
    * @param {number} days - The number of days to add (or subtract) to the current date. (Use negative numbers to subtract days.)
    */
   addDays(days) {
+    days = Number(days);
     if (days > 0) {
-      let daysFromBeginningOfCurrentYear = this.#date.dayOfYear + days;
+      let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
       const yearsToAdd = Math.floor(daysFromBeginningOfCurrentYear / this.#daysInYear);
       this.#date.year += yearsToAdd;
       this.#date.dayOfYear = daysFromBeginningOfCurrentYear % this.#daysInYear;
     } else if (days < 0) {
-      let daysFromBeginningOfCurrentYear = this.#date.dayOfYear + days;
+      let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
       if (daysFromBeginningOfCurrentYear < 1) {
         const yearsToSubtract = Math.floor(Math.abs(daysFromBeginningOfCurrentYear) / this.#daysInYear) + 1;
         this.#date.year -= yearsToSubtract;
@@ -202,6 +214,22 @@ class Calendar {
       throw new Error(`Alarm with name ${alarm.name} already exists`);
     }
     this.#alarms.push(alarm);
+  }
+
+  editAlarm(name, newAlarm) {
+    const alarmIndex = this.#alarms.findIndex(a => a.name === name);
+    if (alarmIndex === -1) {
+      throw new Error(`Alarm with name ${name} not found`);
+    }
+    this.#alarms[alarmIndex] = newAlarm;
+  }
+
+  removeAlarm(name) {
+    const alarmIndex = this.#alarms.findIndex(a => a.name === name);
+    if (alarmIndex === -1) {
+      throw new Error(`Alarm with name ${name} not found`);
+    }
+    this.#alarms.splice(alarmIndex, 1);
   }
   // #endregion mutators
 
@@ -297,5 +325,6 @@ class Calendar {
   }
   // #endregion utility methods
 }
+// END COPY - Do not include the code below in DnDateCalendar.js
 
 module.exports = { Alarm, DnDate, Month, Calendar };
