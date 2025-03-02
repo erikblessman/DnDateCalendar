@@ -11,19 +11,14 @@ const DnDateCalendar = (() => {
   // #region Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
   class Month {
     constructor(fullName, shortName, days) {
-      this.#fullName = fullName;
-      this.#shortName = shortName;
-      this.#days = days;
+      this.fullName = fullName;
+      this.shortName = shortName;
+      this.days = Number(days);
     }
 
-    #fullName;
-    get fullName() { return this.#fullName; }
-
-    #shortName;
-    get shortName() { return this.#shortName; }
-
-    #days;
-    get days() { return this.#days; }
+    fullName;
+    shortName;
+    days;
   }
 
   class DnDate {
@@ -50,21 +45,21 @@ const DnDateCalendar = (() => {
       return {
         schemaVersion: 0,
         months: [
-          new Month('January', 'Jan', '01', 31),
-          new Month('February', 'Feb', '02', 28),
-          new Month('March', 'Mar', '03', 31),
-          new Month('April', 'Apr', '04', 30),
-          new Month('May', 'May', '05', 31),
-          new Month('June', 'Jun', '06', 30),
-          new Month('July', 'Jul', '07', 31),
-          new Month('August', 'Aug', '08', 31),
-          new Month('September', 'Sep', '09', 30),
-          new Month('October', 'Oct', '10', 31),
-          new Month('November', 'Nov', '11', 30),
-          new Month('December', 'Dec', '12', 31),
+          new Month('January', 'Jan', 31),
+          new Month('February', 'Feb', 28),
+          new Month('March', 'Mar', 31),
+          new Month('April', 'Apr', 30),
+          new Month('May', 'May', 31),
+          new Month('June', 'Jun', 30),
+          new Month('July', 'Jul', 31),
+          new Month('August', 'Aug', 31),
+          new Month('September', 'Sep', 30),
+          new Month('October', 'Oct', 31),
+          new Month('November', 'Nov', 30),
+          new Month('December', 'Dec', 31),
         ],
         date: new DnDate(1, 1),
-        format: 'YYYY-MMM-DD',
+        format: 'YYYY-Mon-DD',
         alarms: [],
       };
     };
@@ -82,7 +77,7 @@ const DnDateCalendar = (() => {
      */
     constructor(parms) {
       parms = { ...Calendar.getDefaultParms(), ...parms };
-      this.#schemaVersion = parms.schemaVersion;
+      this.#schemaVersion = Number(parms.schemaVersion);
       this.#date = parms.date;
       this.#format = parms.format;
       this.#alarms = parms.alarms;
@@ -155,13 +150,14 @@ const DnDateCalendar = (() => {
      * Aside from these placeholders, the format string can contain any other characters.
      * @returns 
      */
-    getDateStr(format = this.#format) {
+    getDateStr(date = this.#date) {
+      const format = this.#format;
       // year replacements
       let str = format.replaceAll('DOY', this.#date.dayOfYear.toString());
       str = str.replaceAll(/Y+/g, str => this.#date.year.toString().padStart(str.length, '0'));
 
       // day replacements
-      const parts = this.getDateParts();
+      const parts = this.getDateParts(date);
       str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
 
       // month replacements
@@ -323,8 +319,8 @@ const DnDateCalendar = (() => {
     /***
      * Returns the month, monthIndex, and day of month for the current date.
      */
-    getDateParts() {
-      let days = this.#date.dayOfYear;
+    getDateParts(date = this.#date) {
+      let days = date.dayOfYear;
       for (let i = 0; i < this.#months.length; i++) {
         const month = this.#months[i];
         if (days <= month.days) {
@@ -336,17 +332,32 @@ const DnDateCalendar = (() => {
     // #endregion utility methods
   }
 
+  // END COPY - Do not include the code below in DnDateCalendar.js
+
   // #endregion Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
 
   // #region STATE FUNCTIONS
   const initState = function () {
     try {
       let calendarObj = state[scriptName];
-      if (!calendarObj?.schemaVersion) {
-        calendar = new Calendar();
-      } else if (calendar?.schemaVersion != schemaVersion) {
+      if (calendarObj?.schemaVersion === null || calendarObj?.schemaVersion === undefined) {
+        // Check for no schemaVersion (NOTE: 0 could be a valid schemaVersion, so 
+        // !calendarObj.schemaVersion would not be a valid check)
+        calendar = new Calendar({ schemaVersion: schemaVersion, months: defaultMonths });
+      } else if (calendar?.schemaVersion < schemaVersion) {
+        // Update the calendar
         updateCalendar(calendarObj);
       } else {
+        // Check for versions later than the current version and warn the DM,
+        // but go ahead and try to use the calendar from the state
+        if (calendar?.schemaVersion > schemaVersion) {
+          whisper('gm', header('Unexpected schemaVersion'), list([
+            `Saved Version: ${calendarObj.schemaVersion}`,
+            `Current Version: ${schemaVersion}`
+          ]));
+        }
+
+        // Schema matches, instantiate the DnDateCalendar from the object
         calendar = new Calendar(calendarObj);
       }
       updateState();
@@ -364,20 +375,22 @@ const DnDateCalendar = (() => {
     whisper('gm', header('Updating Calendar Schema') + list([
       `Old Version: ${$oldCalendar.schemaVersion}`,
       `New Version: ${schemaVersion}`]));
-    log(`BEGINNING: ${msg}`);
-    if ($oldCalendar.schemaVersion == 0.1) {
+    if ($oldCalendar.schemaVersion == 0) {
+      calendar = new Calendar();
+    } else if ($oldCalendar.schemaVersion == 0.1) {
       const date = new DnDate($oldCalendar.year, $oldCalendar.dayOfYear);
-      const months = $oldCalendar?.months.map((m, i) => new Month(m.name, m.name.substring(0, 3), (i + 1).toString().padStart(2, '0'), m.days)) ?? defaultMonths;
+      const months = $oldCalendar?.months.map((m) => new Month(m.name, m.name.substring(0, 3), m.days)) ?? defaultMonths;
       const alarms = $oldCalendar?.alarms?.map(a => new Alarm(a.name, new DnDate(a.year, a.dayOfYear), a.message));
-      const newCalendar = new Calendar({ schemaVersion, date, months, alarms });
-      if (!newCalendar) {
-        whisper('gm', 'Failed to update calendar');
+      calendar = new Calendar({ schemaVersion, date, months, alarms });
+      if (!calendar) {
+        whisper('gm', `FAILED: ${msg}`);
         return;
       }
-      calendar = new Calendar({ schemaVersion, date, months, alarms });
     } else {
       throw new Error(`Unknown schema version [${$oldCalendar.schemaVersion}]`);
     }
+    calendar.schemaVersion = schemaVersion;
+    updateState();
     whisper('gm', `COMPLETED: ${msg}`);
   }
   // #endregion STATE FUNCTIONS
@@ -414,25 +427,29 @@ const DnDateCalendar = (() => {
       case 'alarm':
         const command2 = args.shift();
         switch (command2) {
-          case 'add': calendar.addAlarm(args); break;
-          case 'edit': calendar.editAlarm(args); break;
-          case 'delete': calendar.deleteAlarm(args); break;
-          case 'rename': calendar.renameAlarm(args); break;
+          case 'add': calendar.addAlarm(alarmFromArgs(args)); updateState(); break;
+          case 'edit': calendar.editAlarm(args.shift(), alarmFromArgs(args)); updateState(); break;
+          case 'delete': calendar.removeAlarm(args.shift()); updateState(); break;
+          case 'rename': calendar.renameAlarm(args.shift(), args.shift()); updateState(); break;
           default: throw new Error(`Unknown alarm command [${command2}]`);
         }
         showAlarms();
         return;
       case 'next':
         calendar.addDays(1);
+        updateState();
         break;
       case 'prev':
         calendar.addDays(-1);
+        updateState();
         break;
       case 'add':
         calendar.addDays(args);
+        updateState();
         break;
       case 'set':
-        calendar.setDate(args);
+        calendar.setDate(args.shift());
+        updateState();
         break;
       case 'reset':
         delete state[scriptName];
@@ -443,7 +460,7 @@ const DnDateCalendar = (() => {
         showHelp(who);
         return;
       case 'logState':
-        log(JSON.stringify(state));
+        log(JSON.stringify(state[scriptName]));
         return;
       case 'logLevel':
         LOG_LEVEL = args.shift();
@@ -462,12 +479,11 @@ const DnDateCalendar = (() => {
 
   // #region SHOW/CHAT FUNCTIONS
   const debug = function ($msg) {
-    ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && whisper('gm', $msg);
+    ['TRACE', 'DEBUG'].includes(LOG_LEVEL) && log('DEBUG: ' + $msg);
   }
-  const trace = function ($method, $num) {
+  const trace = function ($num) {
     if (['TRACE'].includes(LOG_LEVEL)) {
-      whisper('gm', `${$method}:${$num}`);
-      log(`${$method}:${$num}`);
+      log(`TRACE...........................................................@${$num}`);
     }
   }
   const whisper = function ($who, $content) {
@@ -487,6 +503,7 @@ const DnDateCalendar = (() => {
       ['!dndate alarms', '*show this help message'],
       ['!dndate alarm add|edit NAME DATE MESSAGE', '*add or edit an alarm'],
       ['!dndate alarm rename OLDNAME NEWNAME', '*rename an alarm'],
+      ['!dndate delete NAME', '*delete an alarm'],
       ['!dndate reset', '*reset the date to the default'],
       ['!dndate help [WHO]', 'show this help message (e.g. !dndate help William)'],
     ];
@@ -517,9 +534,19 @@ const DnDateCalendar = (() => {
       whisper('gm', header('Alarms') + 'No alarms set');
       return;
     }
-    const alarmRows = alarms.map(a => [a.name, calendar.dateStr(a.date), a.message]);
+    const alarmRows = alarms.map(a => [a.name, calendar.getDateStr(a.date), a.message]);
     alarmRows.unshift(['Name', 'Date', 'Message']);
     whisper('gm', header('Alarms') + table(alarmRows));
+  }
+  const alarmFromArgs = function (args) {
+    if (args.length < 2) {
+      debug(`Insufficient args (required:2) to create alarm: ${args}`);
+      throw new Error("Unable to create alarm");
+    }
+    const name = args.shift();
+    const date = calendar.parseDateStr(args.shift());
+    let message = args.join(' ');
+    return new Alarm(name, date, message);
   }
   // #endregion CHAT FUNCTIONS
 
@@ -578,18 +605,18 @@ const DnDateCalendar = (() => {
   // #region DEFAULTS
   // Default calendar is the Gregorian calendar, minus leapday/leapyear shenannigans (for simplicity)
   const defaultMonths = [
-    new Month('January', 'Jan', '01', 31),
-    new Month('February', 'Feb', '02', 28),
-    new Month('March', 'Mar', '03', 31),
-    new Month('April', 'Apr', '04', 30),
-    new Month('May', 'May', '05', 31),
-    new Month('June', 'Jun', '06', 30),
-    new Month('July', 'Jul', '07', 31),
-    new Month('August', 'Aug', '08', 31),
-    new Month('September', 'Sep', '09', 30),
-    new Month('October', 'Oct', '10', 31),
-    new Month('November', 'Nov', '11', 30),
-    new Month('December', 'Dec', '12', 31),
+    new Month('January', 'Jan', 31),
+    new Month('February', 'Feb', 28),
+    new Month('March', 'Mar', 31),
+    new Month('April', 'Apr', 30),
+    new Month('May', 'May', 31),
+    new Month('June', 'Jun', 30),
+    new Month('July', 'Jul', 31),
+    new Month('August', 'Aug', 31),
+    new Month('September', 'Sep', 30),
+    new Month('October', 'Oct', 31),
+    new Month('November', 'Nov', 30),
+    new Month('December', 'Dec', 31),
   ];
   // #endregion DEFAULTS
 

@@ -1,19 +1,14 @@
 // BEGIN COPY - Copy everything below this line and above the "// END COPY" line below and paste it into the "Schema" region of DnDateCalendar.js
 class Month {
   constructor(fullName, shortName, days) {
-    this.#fullName = fullName;
-    this.#shortName = shortName;
-    this.#days = days;
+    this.fullName = fullName;
+    this.shortName = shortName;
+    this.days = Number(days);
   }
 
-  #fullName;
-  get fullName() { return this.#fullName; }
-
-  #shortName;
-  get shortName() { return this.#shortName; }
-
-  #days;
-  get days() { return this.#days; }
+  fullName;
+  shortName;
+  days;
 }
 
 class DnDate {
@@ -40,18 +35,18 @@ class Calendar {
     return {
       schemaVersion: 0,
       months: [
-        new Month('January', 'Jan', '01', 31),
-        new Month('February', 'Feb', '02', 28),
-        new Month('March', 'Mar', '03', 31),
-        new Month('April', 'Apr', '04', 30),
-        new Month('May', 'May', '05', 31),
-        new Month('June', 'Jun', '06', 30),
-        new Month('July', 'Jul', '07', 31),
-        new Month('August', 'Aug', '08', 31),
-        new Month('September', 'Sep', '09', 30),
-        new Month('October', 'Oct', '10', 31),
-        new Month('November', 'Nov', '11', 30),
-        new Month('December', 'Dec', '12', 31),
+        new Month('January', 'Jan', 31),
+        new Month('February', 'Feb', 28),
+        new Month('March', 'Mar', 31),
+        new Month('April', 'Apr', 30),
+        new Month('May', 'May', 31),
+        new Month('June', 'Jun', 30),
+        new Month('July', 'Jul', 31),
+        new Month('August', 'Aug', 31),
+        new Month('September', 'Sep', 30),
+        new Month('October', 'Oct', 31),
+        new Month('November', 'Nov', 30),
+        new Month('December', 'Dec', 31),
       ],
       date: new DnDate(1, 1),
       format: 'YYYY-Mon-DD',
@@ -72,7 +67,7 @@ class Calendar {
    */
   constructor(parms) {
     parms = { ...Calendar.getDefaultParms(), ...parms };
-    this.#schemaVersion = parms.schemaVersion;
+    this.#schemaVersion = Number(parms.schemaVersion);
     this.#date = parms.date;
     this.#format = parms.format;
     this.#alarms = parms.alarms;
@@ -145,13 +140,14 @@ class Calendar {
    * Aside from these placeholders, the format string can contain any other characters.
    * @returns 
    */
-  getDateStr(format = this.#format) {
+  getDateStr(date = this.#date) {
+    const format = this.#format;
     // year replacements
     let str = format.replaceAll('DOY', this.#date.dayOfYear.toString());
     str = str.replaceAll(/Y+/g, str => this.#date.year.toString().padStart(str.length, '0'));
 
     // day replacements
-    const parts = this.getDateParts();
+    const parts = this.getDateParts(date);
     str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
 
     // month replacements
@@ -313,8 +309,8 @@ class Calendar {
   /***
    * Returns the month, monthIndex, and day of month for the current date.
    */
-  getDateParts() {
-    let days = this.#date.dayOfYear;
+  getDateParts(date = this.#date) {
+    let days = date.dayOfYear;
     for (let i = 0; i < this.#months.length; i++) {
       const month = this.#months[i];
       if (days <= month.days) {
@@ -325,6 +321,7 @@ class Calendar {
   }
   // #endregion utility methods
 }
+
 // END COPY - Do not include the code below in DnDateCalendar.js
 
 module.exports = { Alarm, DnDate, Month, Calendar };

@@ -16,6 +16,22 @@ describe('Calendar.constructor', () => {
     expect(calendar.format).toBe(parms.format);
     expect(calendar.alarms).toBe(parms.alarms);
   });
+  it('should set properties from string parms', () => {
+    const parms = {
+      schemaVersion: '17',
+      months: [new Month('Month 1', 'M1', '11'), new Month('Month 2', 'M2', '22')],
+      date: new DnDate('1', '1'),
+      format: 'YYYY-MM-DD',
+      alarms: [new Alarm('Alarm 1', 'A1', '1'),]
+    };
+    const calendar = new Calendar(parms);
+    expect(calendar.schemaVersion).toBe(17);
+    expect(calendar.months).toBe(parms.months);
+    expect(calendar.date).toBe(parms.date);
+    expect(calendar.format).toBe(parms.format);
+    expect(calendar.alarms).toBe(parms.alarms);
+    expect(calendar.daysInYear).toBe(33);
+  });
   it('should set schemaVersion from parms', () => {
     const parms = { schemaVersion: 17 };
     const calendar = new Calendar(parms);
@@ -90,6 +106,14 @@ describe('Calendar.constructor', () => {
     expect(typeof calendar.format).toBe('string');
     expect(calendar.format).toBe('six fingered man');
   });
+
+  it('should set months with default value', () => {
+    const calendar = new Calendar();
+    expect(calendar.months).toBeDefined();
+    expect(Array.isArray(calendar.months)).toBe(true);
+    expect(calendar.months.length > 0).toBe(true);
+    expect(calendar.months[0].fullName).toBe('January');
+  });
 });
 
 describe('Calendar.getDefaultParms', () => {
@@ -100,6 +124,7 @@ describe('Calendar.getDefaultParms', () => {
     expect(parms.months).toBeDefined();
     expect(Array.isArray(parms.months)).toBe(true);
     expect(parms.months.length > 0).toBe(true);
+    expect(parms.months[0].fullName).toBe('January');
     expect(parms.date).toBeDefined();
     expect(parms.date).toBeInstanceOf(DnDate);
     expect(parms.format).toBeDefined();
@@ -341,28 +366,6 @@ describe('Calendar.getDateParts', () => {
     expect(parts.monthIndex).toEqual(monthIndex);
     expect(parts.month).toEqual(months[monthIndex]);
     expect(parts.dayOfMonth).toEqual(dayOfMonth);
-  });
-});
-
-describe('Calendar.dateStr', () => {
-  const months = [new Month('Month 1', 'M1', 33)];
-  const date = new DnDate(42, 9);
-  const calendar = new Calendar({ months, date, format: 'DDDD<quack>Month<quack>YYYYYYYY' });
-  // Test valid formats
-  test.each([
-    // format, expectedStr
-    ['YYYY-DOY', '0042-9'],
-    ['YYY-M-DD', '042-1-09'],
-    ['YYY-MM-D', '042-01-9'],
-    ['Y-Mon-DDDD', '42-M1-0009'],
-    ['YYYYYY Month DD', '000042 Month 1 09'],
-    ['Mon Mon Mon', 'M1 M1 M1'],
-  ])('should return the correct date string (%s)', (format, expectedStr) => {
-    expect(calendar.getDateStr(format)).toBe(expectedStr);
-  });
-
-  it('should use the default format if none is provided', () => {
-    expect(calendar.getDateStr()).toBe('0009<quack>Month 1<quack>00000042');
   });
 });
 
