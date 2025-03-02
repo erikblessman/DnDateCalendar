@@ -237,6 +237,47 @@ describe('Calendar.setDate', () => {
   });
 });
 
+describe('Calendar.getDateStr', () => {
+  const parms = {
+    months: [
+      new Month('Monotember', 'Mon', 11),
+      new Month('Duotember', 'Duo', 22),
+      new Month('Tritember', 'Tri', 33)
+    ],
+    date: new DnDate(1, 1),
+  };
+  test.each([
+    // Expected Output, Date, Format
+    ['1123-Monotember-01', 'YYYY-Month-DD', new DnDate(1123, 1)],
+    ['5813-Duo-02', 'YYYY-Mon-DD', new DnDate(5813, 13)],
+    ['2134-03-17', 'YYYY-MM-DD', new DnDate(2134, 50)],
+  ])('should generate expected date string (%s) for format (%s) with given date', (str, format, date) => {
+    const calendar = new Calendar({ ...parms, date: date, format: format });
+    expect(calendar.getDateStr(date)).toBe(str);
+  });
+});
+
+describe('Calendar.getDateStr', () => {
+  const parms = {
+    months: [
+      new Month('Monotember', 'Mon', 11),
+      new Month('Duotember', 'Duo', 22),
+      new Month('Tritember', 'Tri', 33)
+    ],
+    date: new DnDate(1234, 1),
+  };
+  test.each([
+    // Expected Output, Date, Format
+    ['1234-Monotember-01', 'YYYY-Month-DD', null],
+    ['1234-Mon-01', 'YYYY-Mon-DD', null],
+    ['1234-01-01', 'YYYY-MM-DD', null],
+  ])('should generate expected date string (%s) for format (%s) with null date', (str, format, date) => {
+    const calendar = new Calendar({ ...parms, format: format });
+    console.log(JSON.stringify(calendar.toObj()));
+    expect(calendar.getDateStr()).toBe(str);
+  });
+});
+
 describe('Calendar.parseDateStr', () => {
   const calendar = new Calendar({
     months: [
