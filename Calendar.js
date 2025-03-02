@@ -149,6 +149,9 @@ class Calendar {
 
     // day replacements
     const parts = this.getDateParts(date);
+    if (!parts) {
+      throw new Error("Unable to get parts from date: " + JSON.stringify(date));
+    }
     str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
 
     // month replacements
