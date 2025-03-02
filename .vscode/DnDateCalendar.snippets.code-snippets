@@ -18,7 +18,7 @@
 	"DnDate - Trace": {
 		"scope": "javascript",
 		"prefix": "t",
-    "body": ["trace($TM_LINE_INDEX);"],
+    "body": ["trace($TM_LINE_NUMBER);"],
 		"description": "Log a trace message in Roll20 API output"
 	},
 	"DnDate - Debug Clipboard": {
