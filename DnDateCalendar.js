@@ -40,6 +40,7 @@ const DnDateCalendar = (() => {
   }
 
   class Calendar {
+    // TODO: Consider a callback method for when properties of the calendar change to allow for triggering messages
     // #region static
     static getDefaultParms() {
       return {
@@ -158,6 +159,9 @@ const DnDateCalendar = (() => {
 
       // day replacements
       const parts = this.getDateParts(date);
+      if (!parts) {
+        throw new Error("Unable to get parts from date: " + JSON.stringify(date));
+      }
       str = str.replaceAll(/D+/g, str => parts.dayOfMonth.toString().padStart(str.length, '0'));
 
       // month replacements
@@ -179,6 +183,9 @@ const DnDateCalendar = (() => {
      * @param {number} days - The number of days to add (or subtract) to the current date. (Use negative numbers to subtract days.)
      */
     addDays(days) {
+      // TODO: Handle setting off alarms
+      // - Find alarms where prevDate < alarm.date <= newDate
+      //   - Show Alarm Message to GM (Need a callback method for handling this)
       days = Number(days);
       if (days > 0) {
         let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
@@ -331,9 +338,6 @@ const DnDateCalendar = (() => {
     }
     // #endregion utility methods
   }
-
-  // END COPY - Do not include the code below in DnDateCalendar.js
-
   // #endregion Schema (Paste copied Calendar.js code in here) -----------------------------------------------------------
 
   // #region STATE FUNCTIONS
