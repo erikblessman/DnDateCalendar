@@ -30,6 +30,7 @@ class Alarm {
 }
 
 class Calendar {
+  // TODO: Consider a callback method for when properties of the calendar change to allow for triggering messages
   // #region static
   static getDefaultParms() {
     return {
@@ -169,6 +170,9 @@ class Calendar {
    * @param {number} days - The number of days to add (or subtract) to the current date. (Use negative numbers to subtract days.)
    */
   addDays(days) {
+    // TODO: Handle setting off alarms
+    // - Find alarms where prevDate < alarm.date <= newDate
+    //   - Show Alarm Message to GM (Need a callback method for handling this)
     days = Number(days);
     if (days > 0) {
       let daysFromBeginningOfCurrentYear = Number(this.#date.dayOfYear) + days;
